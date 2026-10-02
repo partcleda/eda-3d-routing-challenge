@@ -1,7 +1,16 @@
 # coordinated_refinement — scale
 
-By [jay-tau](https://github.com/jay-tau). All 8/8 cases are legal; 8 strictly improve the credited PR3 routes and 0 retain the original routes (with compact JSON formatting).
+By [jay-tau](https://github.com/jay-tau). Derived from Taz33m's pathfinder_lns and kesudh's warm_lns_refinement, with the exact contributing sources in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Aggregate: 1.12347220 → 1.12483800. Total delay: 539,504 → 538,876.
+Snapshot `2026-10-02T08:29:30.616004+00:00`: 8/8 legal, aggregate 1.128124382375.
 
-The public warm starts are [Taz33m/pathfinder_lns, PR #3](https://github.com/partcleda/eda-3d-routing-challenge/pull/3) at [commit a5ef5e2406682473b99c6496a87a6279b64db9ba](https://github.com/Taz33m/eda-3d-routing-challenge/commit/a5ef5e2406682473b99c6496a87a6279b64db9ba). See the [shared method, attribution, case breakdown, and runtime explanation](../../hard/coordinated_refinement/README.md). Exact per-case provenance is also in meta.json.
+| Case | PR5 delay | Best public case | Submitted | Selected method |
+|---|---:|---:|---:|---|
+| case_01 | 39,398 | 39,276 | 39,262 | exact A* and bounded group refinement |
+| case_02 | 45,508 | 45,404 | 45,378 | exact A* and bounded group refinement |
+| case_03 | 56,530 | 56,434 | 56,414 | exact A* and bounded group refinement |
+| case_04 | 57,190 | 57,072 | 57,056 | exact A* and bounded group refinement |
+| case_05 | 66,361 | 66,191 | 66,181 | exact A* and bounded group refinement |
+| case_06 | 78,349 | 78,113 | 78,079 | exact A* and bounded group refinement |
+| case_07 | 86,611 | 86,413 | 86,395 | exact A* and bounded group refinement |
+| case_08 | 108,929 | 108,513 | 108,499 | exact A* and bounded group refinement |

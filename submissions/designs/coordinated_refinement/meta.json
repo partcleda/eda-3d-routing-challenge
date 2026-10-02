@@ -1,44 +1,357 @@
 {
   "author": "jay-tau",
   "url": "https://github.com/jay-tau",
-  "method": "Exact A* and bounded group refinement of credited pathfinder_lns public warm starts; best legal route per case.",
-  "date": "2026-09-30",
-  "snapshot_at_utc": "2026-09-30T15:28:35.117491+00:00",
-  "warm_start": {
-    "author": "Taz33m",
-    "submission": "pathfinder_lns",
-    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
-    "commit": "a5ef5e2406682473b99c6496a87a6279b64db9ba"
+  "date": "2026-10-02",
+  "snapshot_at_utc": "2026-10-02T08:29:30.616004+00:00",
+  "canonical_commit": "182434de94d0deeeced10578500846fcc3a6acab",
+  "derived_from": {
+    "submission": "pathfinder_lns and warm_lns_refinement",
+    "author": "Taz33m and kesudh"
   },
-  "selection": "Lowest checker-recomputed delay; original route retained on ties.",
-  "runtime": "Omitted: incremental trial times do not include generation of the public warm starts.",
+  "method": "Credited public warm starts, minimum-cut route crossover and bounded exact rerouting; best legal route per case.",
+  "selection": "Lowest checker-recomputed delay; public seed retained on ties.",
+  "runtime": "Omitted: refinement trials exclude the compute that produced public parent routes.",
+  "reference_snapshot_at_utc": "2026-10-02T08:18:10.869020+00:00",
+  "reference_audit_sha256": "8c5b8f55b474a806196b300801b59df0f7183657ebdd2865521f2e012c06dec7",
+  "selection_summary_sha256": "f6b6c34f51b07e9edfa506d847f90019fccf7623f84e74fe33f4763de2245484",
+  "previous_entry": {
+    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/5",
+    "commit": "4533580ce9a84b83c9c80b831d92f2fbac2bdac9"
+  },
+  "comparisons": {
+    "previous_pr5": {
+      "aggregate": 1.42569639296048,
+      "total_delay": 210639,
+      "commit": "182434de94d0deeeced10578500846fcc3a6acab",
+      "submission": "coordinated_refinement"
+    },
+    "current_top": {
+      "aggregate": 1.435550299853414,
+      "total_delay": 209145,
+      "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+      "submission": "warm_lns_refinement"
+    }
+  },
+  "aggregate": 1.4360600366243341,
+  "total_delay": 209065,
   "cases": [
     {
       "case": "ctrl",
-      "warm_start_delay": 50340,
-      "total_delay": 50256,
-      "strict_improvement": true,
-      "method": "exact and group refinement",
-      "warm_start_sha256": "44b844c57fa382444692ceffb64fb697c999f91855fe20afbbd0a3a5d3109429",
-      "route_sha256": "bddffc0fe328e9c511d2c7d5ba086611570b8b80d062ce30992bf3f7e02c78bd"
+      "case_sha256": "024ebda5df67cf2077542524a2bf6109bd40937c9ee901d7d8ec0abcf55402cb",
+      "previous_pr5_delay": 50256,
+      "current_top_delay": 49938,
+      "best_public_case_delay": 49938,
+      "total_delay": 49928,
+      "strict_improvement_vs_best_public_case": true,
+      "route_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+      "route_bytes": 291857,
+      "selected_input_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+      "selected_input_bytes": 291857,
+      "method": "minimum-cut crossover",
+      "provenance": {
+        "route_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+        "route_bytes": 291857,
+        "total_delay": 49928,
+        "experiment": "crossover-final",
+        "metadata_sha256": "9350db2344bf7eade5826e6aeeec2f20244042a2a8cad649b0f14e6c0eb46ef1",
+        "source_code_sha256": {
+          "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
+        },
+        "method": "minimum-cut crossover",
+        "start": {
+          "route_sha256": "f4533ee6388c06c96e963cc2631333ff58326731943dc2ee3861d67111cc377f",
+          "route_bytes": 1315964,
+          "total_delay": 49928,
+          "experiment": "ejection-v1",
+          "metadata_sha256": "8387f25648238e1ff2ea862cad8a716fc3e5484dca7e8df73ce2e3c8cdc1aceb",
+          "source_code_sha256": {
+            "router.cpp": "bc2ae59ca3f8c6960789dbbea9fe0df5f91144afbdd3a0deb16ddd224fe19c68",
+            "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+          },
+          "method": "exact A* and bounded group refinement",
+          "start": {
+            "route_sha256": "62f2b95caf670c8466274f73dd3230ce18bc6e32710d857fd0c504e2cc7c1707",
+            "route_bytes": 292189,
+            "total_delay": 49938,
+            "method": "retained public route",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+            "route": "submissions/designs/warm_lns_refinement/ctrl.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/ctrl.sol.json",
+            "upstream_attribution": {
+              "author": "kesudh",
+              "url": "https://github.com/kesudh",
+              "warm_start": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33"
+              },
+              "upstream_credit": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33",
+                "note": "Warm starts are PR#3's routes at head c2d9d9f, the version merged into main. Where a route is carried unchanged the route_sha256 equals the pr3_sha256 and the credit is his."
+              }
+            }
+          },
+          "seed": 20261003
+        },
+        "steps": [],
+        "parents_considered": 15
+      }
     },
     {
       "case": "int2float",
-      "warm_start_delay": 91270,
-      "total_delay": 91200,
-      "strict_improvement": true,
-      "method": "exact and group refinement",
-      "warm_start_sha256": "c149aa6d7ea8cdf3de46515e21920cc930432220a6ae7196052b756fb565e967",
-      "route_sha256": "e5893acba8494226b88781cdbcf1e187e5ee338e515b471bed527b8a2cb7e41b"
+      "case_sha256": "1d57b7e5b69292592184aa9368930490c5f7af477f4f739db3500a329d6fb16e",
+      "previous_pr5_delay": 91200,
+      "current_top_delay": 90416,
+      "best_public_case_delay": 90416,
+      "total_delay": 90372,
+      "strict_improvement_vs_best_public_case": true,
+      "route_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+      "route_bytes": 478466,
+      "selected_input_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+      "selected_input_bytes": 478466,
+      "method": "minimum-cut crossover",
+      "provenance": {
+        "route_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+        "route_bytes": 478466,
+        "total_delay": 90372,
+        "experiment": "crossover-final",
+        "metadata_sha256": "d3fec5315eada961aad2cf1adf775b20c16a9b95afac7984d085f8417df0064a",
+        "source_code_sha256": {
+          "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
+        },
+        "method": "minimum-cut crossover",
+        "start": {
+          "route_sha256": "e5b9983fb718ee196a514f2c25a60c34d1ced27971d53dd916e2b3d09f756b8c",
+          "route_bytes": 2150361,
+          "total_delay": 90382,
+          "experiment": "baseline-v1",
+          "metadata_sha256": "942fe0a7194bfff35bb551b30d1b2500fde22b3c33847a2ba6a6c9f692f9f1b5",
+          "source_code_sha256": {
+            "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
+            "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+          },
+          "method": "exact A* and bounded group refinement",
+          "start": {
+            "route_sha256": "51438a3f82fcb31680899ffe012905e0450b12c1215289de6a9f2b46d6881f38",
+            "route_bytes": 478974,
+            "total_delay": 90416,
+            "method": "retained public route",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+            "route": "submissions/designs/warm_lns_refinement/int2float.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/int2float.sol.json",
+            "upstream_attribution": {
+              "author": "kesudh",
+              "url": "https://github.com/kesudh",
+              "warm_start": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33"
+              },
+              "upstream_credit": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33",
+                "note": "Warm starts are PR#3's routes at head c2d9d9f, the version merged into main. Where a route is carried unchanged the route_sha256 equals the pr3_sha256 and the credit is his."
+              }
+            }
+          },
+          "seed": 20261002
+        },
+        "steps": [
+          {
+            "before": 90382,
+            "after": 90372,
+            "selected_net_ids": [
+              3,
+              20,
+              44,
+              62,
+              77,
+              78,
+              117
+            ],
+            "implication_count": 103,
+            "parent": {
+              "route_sha256": "1c0baf7c18dc3e1bea143281bcc028cd03688abb464fdcb73721acfb22f40fc3",
+              "route_bytes": 2151405,
+              "total_delay": 90394,
+              "experiment": "ejection-v1",
+              "metadata_sha256": "c23a740efb82896ae6a1cc73afcd2c21a56d4e7905cbd71486020a1f79b47fe0",
+              "source_code_sha256": {
+                "router.cpp": "bc2ae59ca3f8c6960789dbbea9fe0df5f91144afbdd3a0deb16ddd224fe19c68",
+                "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+              },
+              "method": "exact A* and bounded group refinement",
+              "start": {
+                "route_sha256": "51438a3f82fcb31680899ffe012905e0450b12c1215289de6a9f2b46d6881f38",
+                "route_bytes": 478974,
+                "total_delay": 90416,
+                "method": "retained public route",
+                "submission": "warm_lns_refinement",
+                "author": "kesudh",
+                "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+                "route": "submissions/designs/warm_lns_refinement/int2float.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/int2float.sol.json",
+                "upstream_attribution": {
+                  "author": "kesudh",
+                  "url": "https://github.com/kesudh",
+                  "warm_start": {
+                    "author": "Tazeem Mahashin",
+                    "submission": "pathfinder_lns",
+                    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                    "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33"
+                  },
+                  "upstream_credit": {
+                    "author": "Tazeem Mahashin",
+                    "submission": "pathfinder_lns",
+                    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                    "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33",
+                    "note": "Warm starts are PR#3's routes at head c2d9d9f, the version merged into main. Where a route is carried unchanged the route_sha256 equals the pr3_sha256 and the credit is his."
+                  }
+                }
+              },
+              "seed": 20261003
+            }
+          }
+        ],
+        "parents_considered": 14
+      }
     },
     {
       "case": "router",
-      "warm_start_delay": 69237,
-      "total_delay": 69183,
-      "strict_improvement": true,
-      "method": "exact and group refinement",
-      "warm_start_sha256": "e198155e15deaf58598165c22d1948cbafcbc45d80c34480108f1a0e7f83c35f",
-      "route_sha256": "02da4acef7cb7213caf6a7f6f830cc328576902b7db930f2ec198efa8e054093"
+      "case_sha256": "34096ab422d9b1cfff1c607bfc66e28a2a9ab43eeb1e0cd34e481162f017a98c",
+      "previous_pr5_delay": 69183,
+      "current_top_delay": 68791,
+      "best_public_case_delay": 68791,
+      "total_delay": 68765,
+      "strict_improvement_vs_best_public_case": true,
+      "route_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+      "route_bytes": 476711,
+      "selected_input_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+      "selected_input_bytes": 476711,
+      "method": "minimum-cut crossover",
+      "provenance": {
+        "route_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+        "route_bytes": 476711,
+        "total_delay": 68765,
+        "experiment": "crossover-final",
+        "metadata_sha256": "5e8ecc0dca56ba04434b068ef927f21d4b003a5c7075769867dca4c0b0cf7dfc",
+        "source_code_sha256": {
+          "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
+        },
+        "method": "minimum-cut crossover",
+        "start": {
+          "route_sha256": "0d1cadaa1e1fb99346d3b2727062264313501c453b2c724aa51ccd23564dca48",
+          "route_bytes": 2134402,
+          "total_delay": 68771,
+          "experiment": "ejection-v1",
+          "metadata_sha256": "88f5aef12d659d3a7ffc3bf3566e9f7e28705b7afdf937bdca6b5eeaf417a01b",
+          "source_code_sha256": {
+            "router.cpp": "bc2ae59ca3f8c6960789dbbea9fe0df5f91144afbdd3a0deb16ddd224fe19c68",
+            "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+          },
+          "method": "exact A* and bounded group refinement",
+          "start": {
+            "route_sha256": "7fbe8cb65e6044e3e8afa3bd5c27958910142d90d842ae352a46aea24d9d525a",
+            "route_bytes": 476293,
+            "total_delay": 68791,
+            "method": "retained public route",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+            "route": "submissions/designs/warm_lns_refinement/router.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/router.sol.json",
+            "upstream_attribution": {
+              "author": "kesudh",
+              "url": "https://github.com/kesudh",
+              "warm_start": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33"
+              },
+              "upstream_credit": {
+                "author": "Tazeem Mahashin",
+                "submission": "pathfinder_lns",
+                "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33",
+                "note": "Warm starts are PR#3's routes at head c2d9d9f, the version merged into main. Where a route is carried unchanged the route_sha256 equals the pr3_sha256 and the credit is his."
+              }
+            }
+          },
+          "seed": 20261003
+        },
+        "steps": [
+          {
+            "before": 68771,
+            "after": 68765,
+            "selected_net_ids": [
+              56,
+              69,
+              76,
+              77,
+              105,
+              153,
+              159,
+              222,
+              237
+            ],
+            "implication_count": 99,
+            "parent": {
+              "route_sha256": "d5546e9f91931aeb0c6d0289045e5c7ca11a208244ebc3c3e56854e237c9cf7b",
+              "route_bytes": 2134076,
+              "total_delay": 68783,
+              "experiment": "baseline-v1",
+              "metadata_sha256": "74e502ce8a1cd895dcf45c65f91de2e2ecfb08e005ad55c9b0b82beb4b247ce5",
+              "source_code_sha256": {
+                "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
+                "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+              },
+              "method": "exact A* and bounded group refinement",
+              "start": {
+                "route_sha256": "7fbe8cb65e6044e3e8afa3bd5c27958910142d90d842ae352a46aea24d9d525a",
+                "route_bytes": 476293,
+                "total_delay": 68791,
+                "method": "retained public route",
+                "submission": "warm_lns_refinement",
+                "author": "kesudh",
+                "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+                "route": "submissions/designs/warm_lns_refinement/router.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/router.sol.json",
+                "upstream_attribution": {
+                  "author": "kesudh",
+                  "url": "https://github.com/kesudh",
+                  "warm_start": {
+                    "author": "Tazeem Mahashin",
+                    "submission": "pathfinder_lns",
+                    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                    "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33"
+                  },
+                  "upstream_credit": {
+                    "author": "Tazeem Mahashin",
+                    "submission": "pathfinder_lns",
+                    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
+                    "commit": "c2d9d9f583d2f332ebb84d22592ee511f6e56e33",
+                    "note": "Warm starts are PR#3's routes at head c2d9d9f, the version merged into main. Where a route is carried unchanged the route_sha256 equals the pr3_sha256 and the credit is his."
+                  }
+                }
+              },
+              "seed": 20261002
+            }
+          }
+        ],
+        "parents_considered": 14
+      }
     }
   ]
 }

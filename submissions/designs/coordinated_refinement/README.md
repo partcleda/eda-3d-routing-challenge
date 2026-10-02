@@ -1,7 +1,11 @@
 # coordinated_refinement — designs
 
-By [jay-tau](https://github.com/jay-tau). All 3/3 cases are legal; 3 strictly improve the credited PR3 routes and 0 retain the original routes (with compact JSON formatting).
+By [jay-tau](https://github.com/jay-tau). Derived from Taz33m's pathfinder_lns and kesudh's warm_lns_refinement, with the exact contributing sources in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Aggregate: 1.42416814 → 1.42569639. Total delay: 210,847 → 210,639.
+Snapshot `2026-10-02T08:29:30.616004+00:00`: 3/3 legal, aggregate 1.436060036624.
 
-The public warm starts are [Taz33m/pathfinder_lns, PR #3](https://github.com/partcleda/eda-3d-routing-challenge/pull/3) at [commit a5ef5e2406682473b99c6496a87a6279b64db9ba](https://github.com/Taz33m/eda-3d-routing-challenge/commit/a5ef5e2406682473b99c6496a87a6279b64db9ba). See the [shared method, attribution, case breakdown, and runtime explanation](../../hard/coordinated_refinement/README.md). Exact per-case provenance is also in meta.json.
+| Case | PR5 delay | Best public case | Submitted | Selected method |
+|---|---:|---:|---:|---|
+| ctrl | 50,256 | 49,938 | 49,928 | minimum-cut crossover |
+| int2float | 91,200 | 90,416 | 90,372 | minimum-cut crossover |
+| router | 69,183 | 68,791 | 68,765 | minimum-cut crossover |
