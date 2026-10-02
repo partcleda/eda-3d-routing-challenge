@@ -9,7 +9,7 @@ Public modules:
     checker    independent legality checker + delay recomputation
     scorer     per-case scoring + normalized leaderboard
     baseline   reference router (Dijkstra trees + rip-up-and-reroute)
-    suite      the released 20-case suite
+    suite      the generated benchmark tiers (intro, hard, scale, stress, congested)
     viz        matplotlib visualization
     cli        command-line entry point (``python -m m3d.cli``)
 """

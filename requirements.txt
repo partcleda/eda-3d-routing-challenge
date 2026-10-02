@@ -2,3 +2,5 @@
 # library and needs nothing here.
 # Visualization only:
 matplotlib>=3.4
+# animated GIFs (m3d/anim.py uses Image.Quantize / Image.Dither, Pillow 9.1+):
+pillow>=9.1

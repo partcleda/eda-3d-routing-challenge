@@ -2,11 +2,11 @@
 
 Commands
 --------
-  generate        build the deterministic 20-case suite
+  generate        build a deterministic benchmark tier (or all of them)
   baseline        run the baseline router on one case
-  baseline-suite  run the baseline on every case in a suite
+  baseline-suite  run each case's baseline router (per suite.json) on a suite
   evaluate        check + score one submission against one case
-  score-suite     check + score a full 20-case submission (leaderboard)
+  score-suite     check + score a full submission for one tier (leaderboard)
   visualize       render a case (and optional submission) to PNG
   info            print a short summary of a case
 """
@@ -111,23 +111,37 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     return 0 if res.legal else 3
 
 
+def _route_case_baseline(inst: Instance, router: str, order: str):
+    """Route with the router a manifest names as the case's baseline
+    ('negotiated' for the contended tiers, else the simple rip-up router).
+    Returns (submission or None, short failure detail)."""
+    if router == "negotiated":
+        from .negotiated import route_negotiated
+        sub, st = route_negotiated(inst, order=order)
+        return sub, f"{st.overused} overused after {st.iterations} iterations"
+    sub, st = route(inst, order=order)
+    return sub, f"{st.routed_nets}/{st.total_nets}"
+
+
 def cmd_baseline_suite(args: argparse.Namespace) -> int:
     man = _load_manifest(args.suite)
     os.makedirs(args.out_dir, exist_ok=True)
     ok = True
     for c in man["cases"]:
         inst = Instance.load(os.path.join(args.suite, c["instance_file"]))
+        router = c.get("baseline_router", "baseline")
         t0 = time.time()
-        sub, stats = route(inst, order=args.order)
+        sub, detail = _route_case_baseline(inst, router, args.order)
         dt = time.time() - t0
         if sub is None:
-            print(f"  {inst.name}: FAILED ({stats.routed_nets}/{stats.total_nets})")
+            print(f"  {inst.name}: FAILED ({router}: {detail})")
             ok = False
             continue
         res = check(inst, sub)
         out = os.path.join(args.out_dir, f"{inst.name}.sol.json")
         sub.save(out)
-        print(f"  {inst.name}: legal={res.legal} total={res.total_delay} time={dt:.2f}s")
+        print(f"  {inst.name}: legal={res.legal} total={res.total_delay} "
+              f"{router} time={dt:.2f}s")
         ok = ok and res.legal
     return 0 if ok else 3
 
@@ -201,6 +215,10 @@ def cmd_score_suite(args: argparse.Namespace) -> int:
 def cmd_visualize(args: argparse.Namespace) -> int:
     from .viz import visualize
     inst = Instance.load(args.case)
+    if args.layer is not None and not 0 <= args.layer < inst.layers:
+        print(f"m3d visualize: error: --layer {args.layer} is out of range for "
+              f"{inst.name} (layers 0..{inst.layers - 1})", file=sys.stderr)
+        return 2
     sub = Submission.load(args.sol) if args.sol else None
     out = args.out or (os.path.splitext(args.case)[0] +
                        (f".layer{args.layer}" if args.layer is not None else "") + ".png")
@@ -214,6 +232,7 @@ def cmd_run_suite(args: argparse.Namespace) -> int:
     os.makedirs(args.out_dir, exist_ok=True)
     runtimes: Dict[str, float] = {}
     ok = True
+    written = 0
     for c in man["cases"]:
         inst = Instance.load(os.path.join(args.suite, c["instance_file"]))
         t0 = time.time()
@@ -245,12 +264,14 @@ def cmd_run_suite(args: argparse.Namespace) -> int:
             continue
         res = check(inst, sub)
         sub.save(os.path.join(args.out_dir, f"{inst.name}.sol.json"))
+        written += 1
         print(f"  {inst.name}: legal={res.legal} total={res.total_delay} "
               f"{args.router} {dt:.2f}s")
         ok = ok and res.legal
     with open(os.path.join(args.out_dir, "runtime.json"), "w") as fh:
         json.dump(runtimes, fh, indent=1)
-    print(f"wrote {len(man['cases'])} solutions + runtime.json -> {args.out_dir}")
+    print(f"wrote {written}/{len(man['cases'])} solutions + runtime.json "
+          f"-> {args.out_dir}")
     return 0 if ok else 3
 
 
@@ -537,6 +558,9 @@ def cmd_animate(args: argparse.Namespace) -> int:
         anim.suite_sweep_gif(args.suite, out, max_cases=args.max_cases)
         print(f"wrote animation -> {out}")
         return 0
+    if not args.case:
+        print("m3d animate: error: --mode layers requires --case", file=sys.stderr)
+        return 2
     inst = Instance.load(args.case)
     if args.sol:
         sub = Submission.load(args.sol)
@@ -604,7 +628,8 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--ops-factor", type=int, default=200, dest="ops_factor")
     b.set_defaults(func=cmd_baseline)
 
-    bs = sub.add_parser("baseline-suite", help="run the baseline on every case")
+    bs = sub.add_parser("baseline-suite",
+                        help="run each case's baseline router (per suite.json)")
     bs.add_argument("--suite", default="benchmarks")
     bs.add_argument("--out-dir", required=True, dest="out_dir")
     bs.add_argument("--order", default="bbox_desc",
@@ -619,7 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--out", default=None)
     e.set_defaults(func=cmd_evaluate)
 
-    s = sub.add_parser("score-suite", help="score a full 20-case submission")
+    s = sub.add_parser("score-suite", help="score a full submission for one tier")
     s.add_argument("--suite", default="benchmarks")
     s.add_argument("--submission-dir", required=True, dest="submission_dir")
     s.add_argument("--runtimes", default=None, help="optional JSON {case: seconds}")

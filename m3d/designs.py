@@ -411,6 +411,18 @@ def design_configs(layers: int = 6, master_seed: int = 0) -> List[DesignConfig]:
     return cfgs
 
 
+def _built_from(inst: Instance, cfg: DesignConfig) -> bool:
+    """True if a stored instance was built from ``cfg`` (same layers, seeds,
+    delay profile and router), so a resumed build may reuse it. The stored
+    ``channel`` is the width the feasibility search settled on, which can exceed
+    ``cfg.channel``, so it is not compared."""
+    want = {k: v for k, v in cfg.to_params().items() if k != "channel"}
+    have = inst.params or {}
+    return (inst.layers == cfg.layers and inst.seed == cfg.seed
+            and inst.master_seed == cfg.master_seed
+            and all(have.get(k) == v for k, v in want.items()))
+
+
 def build_design_suite(out_dir: str = DESIGN_DIR, blif_dir: str = BLIF_DIR,
                        layers: int = 6, master_seed: int = 0,
                        verbose: bool = True, resume: bool = True) -> Dict:
@@ -441,10 +453,11 @@ def build_design_suite(out_dir: str = DESIGN_DIR, blif_dir: str = BLIF_DIR,
 
         reused = False
         if resume and os.path.exists(inst_path) and os.path.exists(ref_path):
-            try:                                   # trust it only if it re-checks legal
+            try:          # trust it only if built from this config and it re-checks legal
                 inst = Instance.load(inst_path)
                 res = check(inst, Submission.load(ref_path))
-                if res.legal and res.total_delay is not None:
+                if (_built_from(inst, cfg) and res.legal
+                        and res.total_delay is not None):
                     reused = True
                     base = res.total_delay
                     dt = prev.get(cfg.name, {}).get("gen_seconds", 0.0)

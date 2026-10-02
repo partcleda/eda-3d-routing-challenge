@@ -8,9 +8,10 @@ model.
 
 Everything here is self-contained and pure standard library (only the
 visualization needs `matplotlib`). The repository ships a deterministic
-benchmark generator, 20 generated cases each with a **verified legal reference
-solution**, an independent legality checker and scorer, a baseline router, a
-visualization tool, an example participant router, and tests.
+benchmark generator, six benchmark tiers (five generated, one built from real
+circuits) whose every case has a **verified legal reference solution**, an
+independent legality checker and scorer, a baseline router, a visualization
+tool, an example participant router, and tests.
 
 ![layer sweep of a routed case](docs/layer_sweep.gif)
 
@@ -287,7 +288,7 @@ CONTRIBUTING.md      how to submit results by pull request
 scripts/             verify_submissions.py (the check CI runs on every PR)
 .github/workflows/   CI: verify submissions + keep LEADERBOARD.md current
 examples/            example participant router + example submissions
-tests/               unit + end-to-end tests (43)
+tests/               unit + end-to-end tests
 docs/                images, the Pareto plot, and the format reference (FORMATS.md)
 ```
 
@@ -309,7 +310,8 @@ on the committed benchmark instances, so your local score matches CI's exactly.
 
 ```bash
 # regenerate a tier deterministically (intro -> benchmarks/, hard -> benchmarks_hard/,
-# scale -> benchmarks_scale/, or all three)
+# scale -> benchmarks_scale/, ...; `all` builds all six tiers, including the
+# ~30-minute stress tier)
 python -m m3d.cli generate --tier intro
 python -m m3d.cli generate --tier all
 
@@ -319,7 +321,7 @@ python -m m3d.cli baseline --case benchmarks/case_01.json --out my.sol.json
 # evaluate a submission (legality + delay + ratio vs baseline)
 python -m m3d.cli evaluate --case benchmarks/case_01.json --sol my.sol.json --suite benchmarks
 
-# score a full 20-case submission (leaderboard)
+# score a full submission for one tier (leaderboard; here the 20-case intro tier)
 python -m m3d.cli score-suite --suite benchmarks --submission-dir examples/submissions
 
 # visualize a case (all layers, or one layer with --layer N)
@@ -348,7 +350,7 @@ A `Makefile` wraps the common commands: `make generate`, `make baseline`,
 2. For each net, produce a **tree of routing edges** connecting the driver to
    all sinks, obeying the legality rules above.
 3. Write a submission JSON per case (`case_NN.sol.json`) in the submission
-   format (below). Put all 20 in one directory.
+   format (below). Put one per case (all 20 for the intro tier) in one directory.
 4. Score locally:
    `python -m m3d.cli score-suite --suite benchmarks --submission-dir <your_dir>`.
 
@@ -393,14 +395,14 @@ metrics.
   ```
 
   Higher is better; the baseline scores exactly **1.0**. A submission must be
-  **legal on all 20 cases** to be complete and ranked — otherwise it is marked
-  incomplete with aggregate `0.0`.
+  **legal on every case of the tier** to be complete and ranked — otherwise it is
+  marked incomplete with aggregate `0.0`.
 * **Runtime** is recorded separately (pass a `{case: seconds}` JSON via
   `--runtimes`) and never affects the delay score. Runtime limits are a
   deployment policy, applied when you run a router, not part of legality.
 
 The baseline itself is the normalization reference; its per-case totals are in
-`benchmarks/suite.json`.
+each tier's `suite.json` (e.g. `benchmarks/suite.json`).
 
 ---
 
@@ -454,7 +456,7 @@ entry's routes declare `derived_from` in `meta.json` and are marked `†`.
 # self-check your submission, then regenerate the board before you commit
 python -m m3d.cli score-suite --suite benchmarks_hard --submission-dir submissions/hard/<name>
 python -m m3d.cli leaderboard-all          # writes LEADERBOARD.md + README block
-make verify-submissions                    # exactly what CI runs
+make verify-submissions                    # CI's submission checks (CI also runs the tests)
 ```
 
 The seed entries under `submissions/hard/` are the three negotiated variants shown

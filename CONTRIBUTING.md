@@ -48,7 +48,8 @@ python -m m3d.cli leaderboard-all          # writes LEADERBOARD.md + the README 
 
 (For the `intro` tier the suite dir is `benchmarks`, not `benchmarks_intro`.)
 
-`make verify-submissions` runs the same checks CI runs.
+`make verify-submissions` runs the same submission checks CI runs (CI also runs
+the unit tests, `python -m unittest discover -s tests -q`).
 
 ## 4. Open the PR
 

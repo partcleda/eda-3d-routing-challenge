@@ -9,8 +9,16 @@ seed schedule and a size ladder.
   while the negotiated-congestion router certifies a legal solution. Baseline =
   negotiated (a much stronger reference to beat).
 * ``scale`` (dir ``benchmarks_scale/``) — large but sparser cases (up to
-  160x160x6, hundreds of nets, >1k pins) where runtime is a first-class factor.
+  156x156x6, hundreds of nets, ~770 pins) where runtime is a first-class factor.
   Baseline = simple (routes with ~no congestion, so it certifies quickly).
+* ``stress`` (dir ``benchmarks_stress/``) — one giant, sparse 530x530x6 case
+  (901 nets, 2,612 pins) whose simple baseline takes ~30 minutes; a runtime and
+  scaling stress test. Baseline = simple.
+* ``congested`` (dir ``benchmarks_congested/``) — four large, contended cases
+  (64x64x6 .. 116x116x6, up to 302 nets); the congested counterpart of
+  ``stress``. Baseline = negotiated.
+
+(The ``designs`` tier, built from real netlists, lives in ``m3d.designs``.)
 
 Building a tier writes ``<dir>/case_NN.json``, ``<dir>/reference/case_NN.sol.json``
 (the verified reference = the tier's baseline output, kept separate from inputs),
@@ -106,7 +114,8 @@ def suite_configs(tier: str = "intro", layers: int = DEFAULT_LAYERS,
         # case. Net density (~2.6*side) and locality (0.12) keep the cheap middle
         # layers ~35% utilized at every size, so the simple rip-up baseline is
         # hopeless and the negotiated router is stressed by both size and
-        # contention (baseline ~80 s / ~4 min / ~8 min across the three cases).
+        # contention (baseline ~70 s / ~3.5 min / ~8 min / ~10.5 min across
+        # the four cases).
         for side in (64, 88, 112, 116):
             seed = rng.randrange(1, 2 ** 31 - 1)
             i = len(cfgs)

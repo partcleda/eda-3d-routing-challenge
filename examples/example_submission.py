@@ -16,12 +16,14 @@ bounding box first); each net is grown as a tree with multi-source Dijkstra from
 the driver, honoring hard capacity against already-routed nets. There is NO
 rip-up here — that is what keeps this example short and distinct from the
 baseline. If this simple strategy cannot route a net (a conflict it cannot avoid),
-the script falls back to the provided baseline for the whole instance so the
-submission is always complete and legal.
+the script falls back to the provided routers for the whole instance -- the
+simple baseline, then the negotiated-congestion router (which the contended tiers
+need) -- so the submission is always complete and legal.
 
 Replace ``greedy_route`` with your own algorithm to compete. Everything you need
 is public: ``m3d.model`` (data + JSON), ``m3d.grid`` (graph moves),
-``m3d.checker`` (validate locally), ``m3d.baseline`` (reference).
+``m3d.checker`` (validate locally), ``m3d.baseline`` and ``m3d.negotiated``
+(reference routers).
 
 Usage:
     python examples/example_submission.py --case benchmarks/case_01.json --out out.sol.json
@@ -38,7 +40,7 @@ from typing import Dict, List, Optional, Set, Tuple
 # make the repo root importable when this file is run directly (python examples/...)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from m3d import baseline
+from m3d import baseline, negotiated
 from m3d.checker import check
 from m3d.grid import Grid, edge_key
 from m3d.model import Instance, NetRoute, Submission
@@ -95,7 +97,7 @@ def greedy_route(inst: Instance) -> Optional[Submission]:
                         prev[v] = u
                         heapq.heappush(heap, (nd, v))
             if found is None:
-                return None  # greedy failed; caller falls back to baseline
+                return None  # greedy failed; caller falls back to the reference routers
             path = [found]
             cur = found
             while cur in prev:
@@ -119,10 +121,15 @@ def route_instance(inst: Instance) -> Submission:
     sub = greedy_route(inst)
     if sub is not None and check(inst, sub).legal:
         return sub
-    # fall back to the provided baseline so the submission is always complete
+    # fall back to the provided routers so the submission is always complete:
+    # the simple baseline, then the negotiated-congestion router (the reference
+    # for the contended tiers, where the simple baseline fails)
     sub, _ = baseline.route(inst)
     if sub is None:
-        raise RuntimeError(f"could not route {inst.name} (greedy + baseline both failed)")
+        sub, _ = negotiated.route_negotiated(inst)
+    if sub is None:
+        raise RuntimeError(f"could not route {inst.name} "
+                           f"(greedy, baseline and negotiated all failed)")
     return sub
 
 
