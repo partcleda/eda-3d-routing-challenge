@@ -1,7 +1,9 @@
 # coordinated_refinement — stress
 
-By [jay-tau](https://github.com/jay-tau). All 1/1 cases are legal; 1 strictly improve the credited PR3 routes and 0 retain the original routes (with compact JSON formatting).
+By [jay-tau](https://github.com/jay-tau). Declared upstream entries: leonid-popryho. Credited authors: Leonid Popryho. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Aggregate: 1.09057379 → 1.09062989. Total delay: 1,049,818 → 1,049,764.
+Snapshot `2026-10-03T19:16:50.263917+00:00`: 1/1 legal, aggregate 1.098425234622.
 
-The public warm starts are [Taz33m/pathfinder_lns, PR #3](https://github.com/partcleda/eda-3d-routing-challenge/pull/3) at [commit a5ef5e2406682473b99c6496a87a6279b64db9ba](https://github.com/Taz33m/eda-3d-routing-challenge/commit/a5ef5e2406682473b99c6496a87a6279b64db9ba). See the [shared method, attribution, case breakdown, and runtime explanation](../../hard/coordinated_refinement/README.md). Exact per-case provenance is also in meta.json.
+| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+|---|---:|---:|---:|---|
+| case_01 | 1,048,952 | 1,042,322 | 1,042,314 | exact A* and bounded group refinement |

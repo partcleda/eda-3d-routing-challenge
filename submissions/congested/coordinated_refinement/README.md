@@ -1,7 +1,12 @@
 # coordinated_refinement — congested
 
-By [jay-tau](https://github.com/jay-tau). All 4/4 cases are legal; 4 strictly improve the credited PR3 routes and 0 retain the original routes (with compact JSON formatting).
+By [jay-tau](https://github.com/jay-tau). Declared upstream entries: leonid-popryho. Credited authors: Leonid Popryho. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Aggregate: 1.30365441 → 1.30421310. Total delay: 493,503 → 493,227.
+Snapshot `2026-10-03T19:16:50.263917+00:00`: 4/4 legal, aggregate 1.350778756999.
 
-The public warm starts are [Taz33m/pathfinder_lns, PR #3](https://github.com/partcleda/eda-3d-routing-challenge/pull/3) at [commit a5ef5e2406682473b99c6496a87a6279b64db9ba](https://github.com/Taz33m/eda-3d-routing-challenge/commit/a5ef5e2406682473b99c6496a87a6279b64db9ba). See the [shared method, attribution, case breakdown, and runtime explanation](../../hard/coordinated_refinement/README.md). Exact per-case provenance is also in meta.json.
+| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+|---|---:|---:|---:|---|
+| case_01 | 53,965 | 52,235 | 52,233 | exact A* and bounded group refinement |
+| case_02 | 95,426 | 92,874 | 92,856 | exact A* and bounded group refinement |
+| case_03 | 163,757 | 159,155 | 159,095 | exact A* and bounded group refinement |
+| case_04 | 177,243 | 172,069 | 172,047 | exact A* and bounded group refinement |
