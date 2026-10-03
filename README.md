@@ -65,13 +65,14 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 6 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | — |  | — |
 | 7 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | — |  | — |
 | 8 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | — |  | — |
-| 9 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
-| 10 | iamparv7043 | Parv (iamparv7043) | 1.1495 | 9/9 | 175851 | 159.66 | ✓ | — |
-| 11 | drama3d-portfolio | YJ Kim | 1.1121 | 9/9 | 181919 | — |  | — |
-| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
-| 13 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
-| 14 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
-| 15 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
+| 9 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
+| 10 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
+| 11 | iamparv7043 | Parv (iamparv7043) | 1.1495 | 9/9 | 175851 | 159.66 | ✓ | — |
+| 12 | drama3d-portfolio | YJ Kim | 1.1121 | 9/9 | 181919 | — |  | — |
+| 13 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
+| 14 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
+| 15 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
+| 16 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
