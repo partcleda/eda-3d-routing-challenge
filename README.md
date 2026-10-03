@@ -46,10 +46,11 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 3 | coordinated_refinement † | jay-tau | 1.1495 | 20/20 | 342578 | — |  | — |
 | 4 | spt_lns | James (IrwinJam) | 1.1383 | 20/20 | 347680 | 5141.43 | ✓ | — |
 | 5 | anvesh | anvesh | 1.1069 | 20/20 | 360172 | — |  | — |
-| 6 | lns_negotiated | adityuhkapoor | 1.0937 | 20/20 | 367388 | — |  | — |
-| 7 | negotiated_delay | Mantej Singh Gill | 1.0906 | 20/20 | 368046 | 752.29 | ✓ | — |
-| 8 | drama3d-portfolio | YJ Kim | 1.0830 | 20/20 | 373232 | — |  | — |
-| 9 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 | ✓ | — |
+| 6 | spt-recovery | Sameer-Deepak | 1.1004 | 20/20 | 368374 | — |  | — |
+| 7 | lns_negotiated | adityuhkapoor | 1.0937 | 20/20 | 367388 | — |  | — |
+| 8 | negotiated_delay | Mantej Singh Gill | 1.0906 | 20/20 | 368046 | 752.29 | ✓ | — |
+| 9 | drama3d-portfolio | YJ Kim | 1.0830 | 20/20 | 373232 | — |  | — |
+| 10 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 | ✓ | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
@@ -63,15 +64,16 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | reubalink | reubalink | 1.3622 | 9/9 | 147825 | — |  | — |
 | 5 | spt_lns | James (IrwinJam) | 1.3609 | 9/9 | 148193 | — |  | — |
 | 6 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | — |  | — |
-| 7 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | — |  | — |
-| 8 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | — |  | — |
-| 9 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
-| 10 | iamparv7043 | Parv (iamparv7043) | 1.1495 | 9/9 | 175851 | 159.66 | ✓ | — |
-| 11 | drama3d-portfolio | YJ Kim | 1.1121 | 9/9 | 181919 | — |  | — |
-| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
-| 13 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
-| 14 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
-| 15 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
+| 7 | spt-recovery | Sameer-Deepak | 1.2569 | 9/9 | 161183 | — |  | — |
+| 8 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | — |  | — |
+| 9 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | — |  | — |
+| 10 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
+| 11 | iamparv7043 | Parv (iamparv7043) | 1.1495 | 9/9 | 175851 | 159.66 | ✓ | — |
+| 12 | drama3d-portfolio | YJ Kim | 1.1121 | 9/9 | 181919 | — |  | — |
+| 13 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
+| 14 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
+| 15 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
+| 16 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
@@ -85,8 +87,9 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | spt_lns | James (IrwinJam) | 1.1143 | 8/8 | 543962 | 4801.50 | ✓ | — |
 | 5 | anvesh | anvesh | 1.0821 | 8/8 | 559460 | — |  | — |
 | 6 | lns_negotiated | adityuhkapoor | 1.0682 | 8/8 | 567094 | — |  | — |
-| 7 | drama3d-portfolio | YJ Kim | 1.0409 | 8/8 | 581396 | — |  | — |
-| 8 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 | ✓ | — |
+| 7 | spt-recovery | Sameer-Deepak | 1.0496 | 8/8 | 579306 | — |  | — |
+| 8 | drama3d-portfolio | YJ Kim | 1.0409 | 8/8 | 581396 | — |  | — |
+| 9 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 | ✓ | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
@@ -100,6 +103,7 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | spt_lns | James (IrwinJam) | 1.0763 | 1/1 | 1063692 | 3603.75 |  | — |
 | 5 | lns_negotiated | adityuhkapoor | 1.0669 | 1/1 | 1073124 | — |  | — |
 | 6 | drama3d-portfolio | YJ Kim | 1.0201 | 1/1 | 1122320 | — |  | — |
+| 7 | spt-recovery | Sameer-Deepak | 1.0008 | 1/1 | 1143964 | — |  | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
@@ -113,7 +117,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | spt_lns | James (IrwinJam) | 1.2625 | 4/4 | 510661 | 9601.63 |  | — |
 | 5 | lns_negotiated | adityuhkapoor | 1.0981 | 4/4 | 590513 | — |  | — |
 | 6 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0549 | 4/4 | 608243 | 8756.73 |  | — |
-| 7 | drama3d-portfolio | YJ Kim | 1.0160 | 4/4 | 641225 | — |  | — |
+| 7 | spt-recovery | Sameer-Deepak | 1.0518 | 4/4 | 616017 | — |  | — |
+| 8 | drama3d-portfolio | YJ Kim | 1.0160 | 4/4 | 641225 | — |  | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
@@ -128,8 +133,9 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 5 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | — |  | — |
 | 6 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | — |  | — |
 | 7 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
-| 8 | drama3d-portfolio | YJ Kim | 1.1369 | 3/3 | 266925 | — |  | — |
-| 9 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
+| 8 | spt-recovery | Sameer-Deepak | 1.1456 | 3/3 | 264847 | — |  | — |
+| 9 | drama3d-portfolio | YJ Kim | 1.1369 | 3/3 | 266925 | — |  | — |
+| 10 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
 
 † derivative entry (refines another entry's routes): warm_lns_refinement builds on pathfinder_lns (Taz33m); coordinated_refinement builds on pathfinder_lns (Taz33m).
 
