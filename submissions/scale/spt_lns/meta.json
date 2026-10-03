@@ -1,6 +1,6 @@
 {
  "author": "James (IrwinJam)",
  "url": "https://github.com/IrwinJam/m3d-router",
- "method": "Source-aware shortest-path-tree nets + slow negotiated congestion (PathFinder) + per-net exact SPT refinement + annealed large-neighbourhood search (numba)",
- "date": "2026-10-01"
+ "method": "Source-aware shortest-path-tree nets + slow fanout-scaled negotiated congestion (PathFinder) + per-net exact SPT refinement + annealed large-neighbourhood search with ideal-tree and window moves (numba)",
+ "date": "2026-10-02"
 }
