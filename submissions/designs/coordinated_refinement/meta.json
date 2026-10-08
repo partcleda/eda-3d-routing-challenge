@@ -1,214 +1,628 @@
 {
   "author": "jay-tau",
   "url": "https://github.com/jay-tau",
-  "date": "2026-10-03",
-  "snapshot_at_utc": "2026-10-03T19:16:50.263917+00:00",
-  "canonical_commit": "0a8e052944432de0c657f3d45d6838394e627d63",
+  "date": "2026-10-05",
+  "snapshot_at_utc": "2026-10-05T14:48:49.120664+00:00",
+  "canonical_commit": "2566f5f120392182dd97db77ba7760f8bb9b0828",
   "method": "Best legal route per case from credited public parents and the selected refinements.",
   "selection": "Lowest checker-recomputed delay; public seed retained on ties.",
   "runtime": "Omitted: refinement trials exclude the compute that produced public parent routes.",
-  "reference_snapshot_at_utc": "2026-10-03T19:03:01.012628+00:00",
-  "reference_audit_sha256": "907353f3bd282142134065cf42092c26541d2248db24e6aaec1dc1f79912fb8e",
-  "selection_summary_sha256": "acf576648d434289f639b220308dfe44c1d2d7d0f81638c0020268d537f13728",
+  "reference_snapshot_at_utc": "2026-10-05T13:46:53.920278+00:00",
+  "reference_audit_sha256": "0c511913c20f937623f2af5bd2367001ee0ea8e3287153a47361c950dd6c1150",
+  "selection_summary_sha256": "377e4304258266050fdb0e0660282e4891ee87099c509d840186d3cb20d40440",
   "previous_entry": {
-    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/24",
-    "commit": "aaaafa163661f27eb09e878d87f0b98d1c482e33"
+    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/29",
+    "reference": "main",
+    "submission": "coordinated_refinement",
+    "commit": "2566f5f120392182dd97db77ba7760f8bb9b0828",
+    "submitted_commit": "b13a8290d0523453707a8f62199800841d9f8088"
   },
   "comparisons": {
-    "previous_pr24": {
-      "aggregate": 1.4360600366243341,
-      "total_delay": 209065,
-      "commit": "aaaafa163661f27eb09e878d87f0b98d1c482e33",
+    "previous_merged": {
+      "aggregate": 1.4673110927631885,
+      "total_delay": 204497,
+      "commit": "2566f5f120392182dd97db77ba7760f8bb9b0828",
       "submission": "coordinated_refinement"
     },
     "current_top": {
-      "aggregate": 1.466734389631467,
-      "total_delay": 204581,
-      "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-      "submission": "leonid-popryho"
+      "aggregate": 1.468654171277933,
+      "total_delay": 204279,
+      "commit": "91ebf3e500c018bab5c43cb415fd904c189333d0",
+      "submission": "warm_lns_refinement"
     }
   },
-  "aggregate": 1.4673110927631885,
-  "total_delay": 204497,
+  "aggregate": 1.4689158564640312,
+  "total_delay": 204245,
   "cases": [
     {
       "case": "ctrl",
       "case_sha256": "024ebda5df67cf2077542524a2bf6109bd40937c9ee901d7d8ec0abcf55402cb",
-      "previous_pr24_delay": 49928,
-      "current_top_delay": 48948,
-      "best_public_case_delay": 48948,
-      "total_delay": 48930,
+      "previous_merged_delay": 48930,
+      "current_top_delay": 48912,
+      "best_public_case_delay": 48912,
+      "total_delay": 48898,
       "strict_improvement_vs_best_public_case": true,
-      "route_sha256": "63e26a474bd6f815aa405b1ae8bc80a65da2e09b8d4c6835656bb3dec00534b8",
-      "route_bytes": 289823,
-      "selected_input_sha256": "984ad9ff5303cf4cce2649a9c523970cf51a79d263b9a97fecd02353b115b359",
-      "selected_input_bytes": 1305798,
+      "route_sha256": "a260c7761da627d960a8ea8b34bce77f99160d57cd1b719217497ad018a7ab54",
+      "route_bytes": 289621,
+      "selected_input_sha256": "b83ba77ee237088d85fcd757041098e61173e777fba8ec76f89bdd6651d2aee5",
+      "selected_input_bytes": 1304760,
       "method": "exact A* and bounded group refinement",
       "provenance": {
-        "route_sha256": "984ad9ff5303cf4cce2649a9c523970cf51a79d263b9a97fecd02353b115b359",
-        "route_bytes": 1305798,
-        "total_delay": 48930,
-        "experiment": "baseline-v3",
-        "metadata_sha256": "1dd4b161e834851f6cb3bd03b3b466bcad8f0aab50535db0fd6564045c789223",
+        "route_sha256": "b83ba77ee237088d85fcd757041098e61173e777fba8ec76f89bdd6651d2aee5",
+        "route_bytes": 1304760,
+        "total_delay": 48898,
+        "experiment": "baseline-v4",
+        "metadata_sha256": "1482af6e0131ed705b6fdc4c091c8c682b104d863a860efad9a15b746c797c8e",
         "source_code_sha256": {
           "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
           "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
         },
         "method": "exact A* and bounded group refinement",
         "start": {
-          "route_sha256": "5149d28cac4361d3655dcff199b078825f059fc8ea10b5939869b33289e38375",
-          "route_bytes": 289431,
-          "total_delay": 48948,
+          "route_sha256": "20b7831b80fb2f69ede079bcceff20031e9c5e5448bf798f3363fd5358939311",
+          "route_bytes": 289976,
+          "total_delay": 48912,
           "experiment": "crossover-public",
-          "metadata_sha256": "a5de617891eb8094a86d571dfa187fd88a9dc277d7ea23dbaeaef8cb7b0e1e4d",
+          "metadata_sha256": "33c92f55f6e9ea21ae953fbcb423dba57f03ace1a80c3d9cc3660dd00ff77b96",
           "source_code_sha256": {
             "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
           },
           "method": "minimum-cut crossover",
           "start": {
-            "route_sha256": "afddbd8c28610b8dacd982c697e0c496b196867dc33f8699bb0a78d926133220",
-            "route_bytes": 289430,
-            "total_delay": 48948,
+            "route_sha256": "20b7831b80fb2f69ede079bcceff20031e9c5e5448bf798f3363fd5358939311",
+            "route_bytes": 289976,
+            "total_delay": 48912,
             "method": "retained public route",
-            "submission": "leonid-popryho",
-            "author": "Leonid Popryho",
-            "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-            "route": "submissions/designs/leonid-popryho/ctrl.sol.json",
-            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/ctrl.sol.json",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "91ebf3e500c018bab5c43cb415fd904c189333d0",
+            "route": "submissions/designs/warm_lns_refinement/ctrl.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/ctrl.sol.json",
             "upstream_attribution": {
-              "author": "Leonid Popryho",
-              "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries"
+              "author": "kesudh",
+              "url": "https://github.com/kesudh/eda-3d-routing-challenge/tree/submission/warm_lns_refinement_v2/submissions/intro/warm_lns_refinement/replay",
+              "method": "Exact shortest-path-tree warm refinement: radix A*, feasible per-sink bounds, neutral and group reroutes, preserved-route and displacement-chain repair, optional circular integer buckets, multiple CPU search workers, strict final-walk polishing, and exact two-parent minimum-cut crossover following PR24. Our GPU kernels are audited prototypes and did not generate these refinements; selected PR26 public warm starts are attributed to its GPU-accelerated engine. Bounded conflict-based search over static multi-sink trees, alternated with neutral group reroutes; opt-in specialized chain pricing avoids full-grid cost setup.",
+              "derived_from": {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau"
+              }
             },
             "upstream_metadata": {
-              "sha256": "45e72bff5b7e78fac43f8e956ca25da5919b321baed6062d8521056d134088c2",
-              "bytes": 168,
-              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/meta.json"
-            }
+              "sha256": "fb075ec9379e4ff01a3d6e723ff30d2a1a6c589c5843c6c6d65f7e6315ad191d",
+              "bytes": 34013,
+              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/meta.json",
+              "note": "Source-author report, which may describe earlier stages rather than the current route; commands, logs and machine-specific paths are omitted from the case excerpt."
+            },
+            "upstream_case": {
+              "tier": "designs",
+              "case": "ctrl",
+              "variant": "resilience_incumbent",
+              "source": "local_envelope",
+              "delay": 49906,
+              "legal": true,
+              "reasons": [],
+              "solver_wall_s": 12.223860199999763,
+              "solver_cpu_s": 35.984375,
+              "independent_validation_s": 0.09983510000165552,
+              "runtime_s": 24.74438950001786,
+              "sha256": "015b3af99962fc46d01ac1d4222d32fededf3da34ee1ed746f426afa7e124955",
+              "source_sha256": "998b68cb6ca87a91fc2f298b3a91e235d44035e8fe497dc74015b4f0ef6a3862",
+              "exe_sha256": "62ecc2d8bfda88da565842e77fb1b0581463851ed50f38daf044f9ca16d52703",
+              "measured_at": "2026-10-02T10:05:59.648317+00:00",
+              "stage_runtime_s": 12.323695300001418,
+              "parent_measurement": {
+                "tier": "designs",
+                "case": "ctrl",
+                "variant": "deepen_portfolio",
+                "source": "local_envelope",
+                "delay": 49914,
+                "legal": true,
+                "reasons": [],
+                "solver_wall_s": 12.135319300010451,
+                "solver_cpu_s": 35.859375,
+                "independent_validation_s": 0.14014030000544153,
+                "runtime_s": 12.420694200016442,
+                "sha256": "998b68cb6ca87a91fc2f298b3a91e235d44035e8fe497dc74015b4f0ef6a3862",
+                "source_sha256": "c29e4d0c4ab64f407adcd9b0e663bfc9588cb9eb8688188d323b35560e74744b",
+                "exe_sha256": "26d4a93436cf566bc568ffbecbf7881ff8489196befdbd9b243035bff0cb1441",
+                "measured_at": "2026-10-02T09:54:43.960819+00:00",
+                "stage_runtime_s": 12.275459600015893,
+                "parent_measurement": {
+                  "tier": "designs",
+                  "case": "ctrl",
+                  "variant": "astar_polish",
+                  "source": "pr24",
+                  "delay": 49928,
+                  "legal": true,
+                  "reasons": [],
+                  "solver_wall_s": 0.06707659999665339,
+                  "solver_cpu_s": 0.0625,
+                  "independent_validation_s": 0.07815800000389572,
+                  "runtime_s": 0.1452346000005491,
+                  "sha256": "c29e4d0c4ab64f407adcd9b0e663bfc9588cb9eb8688188d323b35560e74744b",
+                  "source_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+                  "exe_sha256": "d10c46019d4ccab0ce1f9782fc139c99a2c2560a23eb8b65cb834bc97040f196",
+                  "measured_at": "2026-10-02T09:22:07.897308+00:00"
+                }
+              }
+            },
+            "upstream_warm_starts": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "input": "PR24/submissions/designs/coordinated_refinement/ctrl.sol.json",
+                "sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa"
+              }
+            ],
+            "reported_public_ancestry": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa",
+                "route": "submissions/designs/coordinated_refinement/ctrl.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/ctrl.sol.json",
+                "route_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+                "route_bytes": 291857,
+                "upstream_metadata": {
+                  "sha256": "cd6fed45801bee7a5e62023e84a01a9998c9633d4b0d6c650758e85ad93a354d",
+                  "bytes": 17276,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns; warm_lns_refinement",
+                  "author": "Taz33m; Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "2a9413a58839688542b08680d4b43d13e19ebda30f5bcf5ff03bc50bc8418d8d",
+                "reported_hash_matches": true
+              },
+              {
+                "submission": "warm_lns_refinement",
+                "author": "kesudh",
+                "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+                "route": "submissions/designs/warm_lns_refinement/ctrl.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/ctrl.sol.json",
+                "route_sha256": "62f2b95caf670c8466274f73dd3230ce18bc6e32710d857fd0c504e2cc7c1707",
+                "route_bytes": 292189,
+                "upstream_metadata": {
+                  "sha256": "5729d8f0e89cb585cf70ca01a5e8c80266f0306050ae15a24626298f13f28eeb",
+                  "bytes": 2559,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns",
+                  "author": "Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "62f2b95caf670c8466274f73dd3230ce18bc6e32710d857fd0c504e2cc7c1707",
+                "reported_hash_matches": true
+              }
+            ]
           },
           "steps": [],
-          "parents_considered": 15
+          "parents_considered": 13
         },
-        "seed": 20261004
+        "seed": 20261005
       }
     },
     {
       "case": "int2float",
       "case_sha256": "1d57b7e5b69292592184aa9368930490c5f7af477f4f739db3500a329d6fb16e",
-      "previous_pr24_delay": 90372,
-      "current_top_delay": 88112,
-      "best_public_case_delay": 88112,
-      "total_delay": 88064,
+      "previous_merged_delay": 88064,
+      "current_top_delay": 87894,
+      "best_public_case_delay": 87894,
+      "total_delay": 87880,
       "strict_improvement_vs_best_public_case": true,
-      "route_sha256": "7382b9b3f65f5e4c06719020ec2dd09f2844c5375b596fd6ce5312dd6ebb67e1",
-      "route_bytes": 470696,
-      "selected_input_sha256": "d4129f10b057f387563c286859e8c3a90e8c25dc208738a496cbbcb974368b82",
-      "selected_input_bytes": 2114235,
+      "route_sha256": "97ffca1c26185ac4be527a34a12d1c9d259e2b40a46eb103ae4619b4835d304d",
+      "route_bytes": 469797,
+      "selected_input_sha256": "ccc18a7fb2d952a216174e219fc194d97f8981cbe95027a83524e61472d6cabb",
+      "selected_input_bytes": 2109840,
       "method": "exact A* and bounded group refinement",
       "provenance": {
-        "route_sha256": "d4129f10b057f387563c286859e8c3a90e8c25dc208738a496cbbcb974368b82",
-        "route_bytes": 2114235,
-        "total_delay": 88064,
-        "experiment": "baseline-v3",
-        "metadata_sha256": "c75ce7aa9fa848700decea9af063cc221fbeb8c639b5b91698d0b5b23bbb6583",
+        "route_sha256": "ccc18a7fb2d952a216174e219fc194d97f8981cbe95027a83524e61472d6cabb",
+        "route_bytes": 2109840,
+        "total_delay": 87880,
+        "experiment": "incumbent-pilot",
+        "metadata_sha256": "c5703c1da5e0e13e6533afbd50f216dccd4c9c789a933b94d2aeb010cfc339c4",
         "source_code_sha256": {
           "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
-          "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+          "cbs.hpp": "c30dab6c2e80232b828d7d2044b332b8176070d4a5a64037e762ecb18e754190"
         },
         "method": "exact A* and bounded group refinement",
         "start": {
-          "route_sha256": "732d7aa6f3887a34b4c27166303f6fb1c141f20099c34665e6ae04dade45d6e4",
-          "route_bytes": 470874,
-          "total_delay": 88112,
+          "route_sha256": "a84caf5e5b23961930ab4cc0ea9ec64ddb482ae7ef085808cb5fd47a63fccdb5",
+          "route_bytes": 470212,
+          "total_delay": 87894,
           "experiment": "crossover-public",
-          "metadata_sha256": "3e550ccf1d02c852b9dae6069d49064432fc00538733cc17d1622cf314094067",
+          "metadata_sha256": "7c5450f18d8462fce44c6afe35d8b1e337ac41ca3981ad5d112d6a4935053933",
           "source_code_sha256": {
             "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
           },
           "method": "minimum-cut crossover",
           "start": {
-            "route_sha256": "93acf148660a8950fda5fb95c9fbecd88861500d76618ebe264967c45efd4553",
-            "route_bytes": 470873,
-            "total_delay": 88112,
+            "route_sha256": "a84caf5e5b23961930ab4cc0ea9ec64ddb482ae7ef085808cb5fd47a63fccdb5",
+            "route_bytes": 470212,
+            "total_delay": 87894,
             "method": "retained public route",
-            "submission": "leonid-popryho",
-            "author": "Leonid Popryho",
-            "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-            "route": "submissions/designs/leonid-popryho/int2float.sol.json",
-            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/int2float.sol.json",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "91ebf3e500c018bab5c43cb415fd904c189333d0",
+            "route": "submissions/designs/warm_lns_refinement/int2float.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/int2float.sol.json",
             "upstream_attribution": {
-              "author": "Leonid Popryho",
-              "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries"
+              "author": "kesudh",
+              "url": "https://github.com/kesudh/eda-3d-routing-challenge/tree/submission/warm_lns_refinement_v2/submissions/intro/warm_lns_refinement/replay",
+              "method": "Exact shortest-path-tree warm refinement: radix A*, feasible per-sink bounds, neutral and group reroutes, preserved-route and displacement-chain repair, optional circular integer buckets, multiple CPU search workers, strict final-walk polishing, and exact two-parent minimum-cut crossover following PR24. Our GPU kernels are audited prototypes and did not generate these refinements; selected PR26 public warm starts are attributed to its GPU-accelerated engine. Bounded conflict-based search over static multi-sink trees, alternated with neutral group reroutes; opt-in specialized chain pricing avoids full-grid cost setup.",
+              "derived_from": {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau"
+              }
             },
             "upstream_metadata": {
-              "sha256": "45e72bff5b7e78fac43f8e956ca25da5919b321baed6062d8521056d134088c2",
-              "bytes": 168,
-              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/meta.json"
-            }
+              "sha256": "fb075ec9379e4ff01a3d6e723ff30d2a1a6c589c5843c6c6d65f7e6315ad191d",
+              "bytes": 34013,
+              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/meta.json",
+              "note": "Source-author report, which may describe earlier stages rather than the current route; commands, logs and machine-specific paths are omitted from the case excerpt."
+            },
+            "upstream_case": {
+              "tier": "designs",
+              "case": "int2float",
+              "variant": "focused_escape",
+              "source": "local_envelope",
+              "delay": 90316,
+              "legal": true,
+              "reasons": [],
+              "solver_wall_s": 20.20366749999812,
+              "solver_cpu_s": 60.078125,
+              "independent_validation_s": 0.10488709999481216,
+              "runtime_s": 75.82009259996994,
+              "sha256": "bdc09d5ffc92b9b3506b1eb0f5abfab2b92011e393cae940e541c78414b9c6ee",
+              "source_sha256": "c4ee7b6424f0ea0a85b8765751d1d3a650f0f7a17053cf4479f12d748e5b112e",
+              "exe_sha256": "b5803388e99ad375a5e53754eefb1184f05a1d2d0e1e5f9240ad6bd1e5bda63d",
+              "measured_at": "2026-10-02T10:16:36.758323+00:00",
+              "stage_runtime_s": 20.30855459999293,
+              "parent_measurement": {
+                "tier": "designs",
+                "case": "int2float",
+                "variant": "resilience_incumbent",
+                "source": "local_envelope",
+                "delay": 90326,
+                "legal": true,
+                "reasons": [],
+                "solver_wall_s": 12.208265199995367,
+                "solver_cpu_s": 35.9375,
+                "independent_validation_s": 0.1276695000124164,
+                "runtime_s": 55.51153799997701,
+                "sha256": "c4ee7b6424f0ea0a85b8765751d1d3a650f0f7a17053cf4479f12d748e5b112e",
+                "source_sha256": "72953d11d1af9b768f59ef473262f5d21bacac5ad7ba2562fc85655a908a547f",
+                "exe_sha256": "62ecc2d8bfda88da565842e77fb1b0581463851ed50f38daf044f9ca16d52703",
+                "measured_at": "2026-10-02T10:06:12.001753+00:00",
+                "stage_runtime_s": 12.335934700007783,
+                "parent_measurement": {
+                  "tier": "designs",
+                  "case": "int2float",
+                  "variant": "deepen_portfolio",
+                  "source": "local_envelope",
+                  "delay": 90330,
+                  "legal": true,
+                  "reasons": [],
+                  "solver_wall_s": 12.32446269999491,
+                  "solver_cpu_s": 35.8125,
+                  "independent_validation_s": 0.32899859998724423,
+                  "runtime_s": 43.175603299969225,
+                  "sha256": "72953d11d1af9b768f59ef473262f5d21bacac5ad7ba2562fc85655a908a547f",
+                  "source_sha256": "ab65c6f464613c9a011040ce0ff21be9b3927c8ecc07bd6f81da9d3902829b1a",
+                  "exe_sha256": "26d4a93436cf566bc568ffbecbf7881ff8489196befdbd9b243035bff0cb1441",
+                  "measured_at": "2026-10-02T09:54:56.622525+00:00",
+                  "stage_runtime_s": 12.653461299982155,
+                  "parent_measurement": {
+                    "tier": "designs",
+                    "case": "int2float",
+                    "variant": "pr24_search",
+                    "source": "pr24",
+                    "delay": 90354,
+                    "legal": true,
+                    "reasons": [],
+                    "solver_wall_s": 30.28693219998968,
+                    "solver_cpu_s": 29.78125,
+                    "independent_validation_s": 0.2352097999973921,
+                    "runtime_s": 30.52214199998707,
+                    "sha256": "ab65c6f464613c9a011040ce0ff21be9b3927c8ecc07bd6f81da9d3902829b1a",
+                    "source_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+                    "exe_sha256": "f69c92e7a12c087d08cf0b468eb9324e83c113f8a33e22d57f788bad23ef685e",
+                    "measured_at": "2026-10-02T09:04:35.778936+00:00"
+                  }
+                }
+              }
+            },
+            "upstream_warm_starts": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "input": "PR24/submissions/designs/coordinated_refinement/int2float.sol.json",
+                "sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa"
+              }
+            ],
+            "reported_public_ancestry": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa",
+                "route": "submissions/designs/coordinated_refinement/int2float.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/int2float.sol.json",
+                "route_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+                "route_bytes": 478466,
+                "upstream_metadata": {
+                  "sha256": "cd6fed45801bee7a5e62023e84a01a9998c9633d4b0d6c650758e85ad93a354d",
+                  "bytes": 17276,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns; warm_lns_refinement",
+                  "author": "Taz33m; Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "03908cb9c038bbaf62b9ddfff442549d2eaf382519a9a6158015d336dc93a4a8",
+                "reported_hash_matches": true
+              },
+              {
+                "submission": "warm_lns_refinement",
+                "author": "kesudh",
+                "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+                "route": "submissions/designs/warm_lns_refinement/int2float.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/int2float.sol.json",
+                "route_sha256": "51438a3f82fcb31680899ffe012905e0450b12c1215289de6a9f2b46d6881f38",
+                "route_bytes": 478974,
+                "upstream_metadata": {
+                  "sha256": "5729d8f0e89cb585cf70ca01a5e8c80266f0306050ae15a24626298f13f28eeb",
+                  "bytes": 2559,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns",
+                  "author": "Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "51438a3f82fcb31680899ffe012905e0450b12c1215289de6a9f2b46d6881f38",
+                "reported_hash_matches": true
+              }
+            ]
           },
           "steps": [],
-          "parents_considered": 15
+          "parents_considered": 13
         },
-        "seed": 20261004
+        "seed": 20261005
       }
     },
     {
       "case": "router",
       "case_sha256": "34096ab422d9b1cfff1c607bfc66e28a2a9ab43eeb1e0cd34e481162f017a98c",
-      "previous_pr24_delay": 68765,
-      "current_top_delay": 67521,
-      "best_public_case_delay": 67521,
-      "total_delay": 67503,
+      "previous_merged_delay": 67503,
+      "current_top_delay": 67473,
+      "best_public_case_delay": 67473,
+      "total_delay": 67467,
       "strict_improvement_vs_best_public_case": true,
-      "route_sha256": "b8554316ffd35feb2efd9a938bc332691c5e995a4df7e30d32e74845277c4dca",
-      "route_bytes": 472537,
-      "selected_input_sha256": "c43da788310391e7ad1a16a697f7b5323b2559c9cce605e58f7253b687f4596b",
-      "selected_input_bytes": 2115864,
+      "route_sha256": "03a2fe493b14c1a5b747f1cd9eaf782c1a899393e06bf6bca2c4b3f18a7d8370",
+      "route_bytes": 472571,
+      "selected_input_sha256": "6eebb6e1c96812dc8bf404dcf616068eb450dff0433c7b66f263d2e5aeec194f",
+      "selected_input_bytes": 2115746,
       "method": "exact A* and bounded group refinement",
       "provenance": {
-        "route_sha256": "c43da788310391e7ad1a16a697f7b5323b2559c9cce605e58f7253b687f4596b",
-        "route_bytes": 2115864,
-        "total_delay": 67503,
-        "experiment": "baseline-v3",
-        "metadata_sha256": "51b1099148c7aca3108d7fa5ce049db2ff8dc2ddb9fb3048a95f83749fc53422",
+        "route_sha256": "6eebb6e1c96812dc8bf404dcf616068eb450dff0433c7b66f263d2e5aeec194f",
+        "route_bytes": 2115746,
+        "total_delay": 67467,
+        "experiment": "baseline-v4",
+        "metadata_sha256": "06c2b0920f4343d18546b719d47e6eae51addf5181685421d93be75ba9e14187",
         "source_code_sha256": {
           "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
           "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
         },
         "method": "exact A* and bounded group refinement",
         "start": {
-          "route_sha256": "bd419d397a6b7dc7d775983f530aa42dc8f11c86d6d03b401a45e22b51be0c1b",
-          "route_bytes": 472156,
-          "total_delay": 67521,
+          "route_sha256": "cf2a1a90e69970d551b63451f451499347c5d9cff1ab271225e375d4eff1324e",
+          "route_bytes": 473035,
+          "total_delay": 67473,
           "experiment": "crossover-public",
-          "metadata_sha256": "40dee2204cb2439f0dd5a64c5b93593d395aeed913a0300e38e30892d26d6365",
+          "metadata_sha256": "4fab4de8459a80292fe523ed79e87c585037f6c5537a3f607da2f4164cfd84ba",
           "source_code_sha256": {
             "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
           },
           "method": "minimum-cut crossover",
           "start": {
-            "route_sha256": "037c2223cda6024025ac0f5016d5bcd7b22fd724c7ae882cc6d34637f271360a",
-            "route_bytes": 472155,
-            "total_delay": 67521,
+            "route_sha256": "cf2a1a90e69970d551b63451f451499347c5d9cff1ab271225e375d4eff1324e",
+            "route_bytes": 473035,
+            "total_delay": 67473,
             "method": "retained public route",
-            "submission": "leonid-popryho",
-            "author": "Leonid Popryho",
-            "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-            "route": "submissions/designs/leonid-popryho/router.sol.json",
-            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/router.sol.json",
+            "submission": "warm_lns_refinement",
+            "author": "kesudh",
+            "commit": "91ebf3e500c018bab5c43cb415fd904c189333d0",
+            "route": "submissions/designs/warm_lns_refinement/router.sol.json",
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/router.sol.json",
             "upstream_attribution": {
-              "author": "Leonid Popryho",
-              "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries"
+              "author": "kesudh",
+              "url": "https://github.com/kesudh/eda-3d-routing-challenge/tree/submission/warm_lns_refinement_v2/submissions/intro/warm_lns_refinement/replay",
+              "method": "Exact shortest-path-tree warm refinement: radix A*, feasible per-sink bounds, neutral and group reroutes, preserved-route and displacement-chain repair, optional circular integer buckets, multiple CPU search workers, strict final-walk polishing, and exact two-parent minimum-cut crossover following PR24. Our GPU kernels are audited prototypes and did not generate these refinements; selected PR26 public warm starts are attributed to its GPU-accelerated engine. Bounded conflict-based search over static multi-sink trees, alternated with neutral group reroutes; opt-in specialized chain pricing avoids full-grid cost setup.",
+              "derived_from": {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau"
+              }
             },
             "upstream_metadata": {
-              "sha256": "45e72bff5b7e78fac43f8e956ca25da5919b321baed6062d8521056d134088c2",
-              "bytes": 168,
-              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/designs/leonid-popryho/meta.json"
-            }
+              "sha256": "fb075ec9379e4ff01a3d6e723ff30d2a1a6c589c5843c6c6d65f7e6315ad191d",
+              "bytes": 34013,
+              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/91ebf3e500c018bab5c43cb415fd904c189333d0/submissions/designs/warm_lns_refinement/meta.json",
+              "note": "Source-author report, which may describe earlier stages rather than the current route; commands, logs and machine-specific paths are omitted from the case excerpt."
+            },
+            "upstream_case": {
+              "delay": 68755,
+              "legal": true,
+              "runtime_s": 26.63157019999926,
+              "solver_cpu_s": 0.5,
+              "sha256": "8931712b40280bd6eeeb3972fb9bbc5b3ded56ae3211cced042e250e8b6eedb8",
+              "a_delay": 68757,
+              "b_delay": 68763,
+              "selected_b": 4,
+              "implications": 195,
+              "tier": "designs",
+              "case": "router",
+              "variant": "pairwise_crossover",
+              "kind": "pairwise",
+              "source": "local_envelope",
+              "algorithm_sha256": "59c038818c60a136d5b1dbe3e1caf9f7a6cce57ce7b324a5cc88b60b1b69684b",
+              "source_sha256": "b30b26c1e79e89b5344dc632f823a805c1ee011a39e8d6dd827de99ee0cd35c6",
+              "parent_measurements": [
+                {
+                  "delay": 68757,
+                  "legal": true,
+                  "runtime_s": 21.57819610000297,
+                  "solver_cpu_s": 0.390625,
+                  "sha256": "b30b26c1e79e89b5344dc632f823a805c1ee011a39e8d6dd827de99ee0cd35c6",
+                  "a_delay": 68759,
+                  "b_delay": 68761,
+                  "selected_b": 8,
+                  "implications": 186,
+                  "tier": "designs",
+                  "case": "router",
+                  "variant": "pairwise_crossover",
+                  "kind": "pairwise",
+                  "source": "local_envelope",
+                  "algorithm_sha256": "59c038818c60a136d5b1dbe3e1caf9f7a6cce57ce7b324a5cc88b60b1b69684b",
+                  "source_sha256": "9e36fad4ea7262b8e38955e5d676feb5c8edbbb99afc013d0ac395829eb31013",
+                  "parent_measurements": [
+                    {
+                      "tier": "designs",
+                      "case": "router",
+                      "variant": "deepen_portfolio",
+                      "source": "local_envelope",
+                      "delay": 68759,
+                      "legal": true,
+                      "reasons": [],
+                      "solver_wall_s": 12.406070900004124,
+                      "solver_cpu_s": 35.3125,
+                      "independent_validation_s": 0.12802910000027623,
+                      "runtime_s": 12.766112800003611,
+                      "sha256": "9e36fad4ea7262b8e38955e5d676feb5c8edbbb99afc013d0ac395829eb31013",
+                      "source_sha256": "2abbcfdbb861551d02973f378a4fb8b6807b5055ad621a17da59a45a2ede2c80",
+                      "exe_sha256": "26d4a93436cf566bc568ffbecbf7881ff8489196befdbd9b243035bff0cb1441",
+                      "measured_at": "2026-10-02T09:55:09.180563+00:00",
+                      "stage_runtime_s": 12.5341000000044,
+                      "parent_measurement": {
+                        "tier": "designs",
+                        "case": "router",
+                        "variant": "adversarial_polish/coordinated_refinement",
+                        "source": "coordinated_refinement",
+                        "delay": 68765,
+                        "legal": true,
+                        "reasons": [],
+                        "solver_wall_s": 0.11602829999173991,
+                        "solver_cpu_s": 0.0625,
+                        "independent_validation_s": 0.11598450000747107,
+                        "runtime_s": 0.23201279999921098,
+                        "sha256": "2abbcfdbb861551d02973f378a4fb8b6807b5055ad621a17da59a45a2ede2c80",
+                        "source_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                        "exe_sha256": "7a11406bbc53bf39076980446f8a0033535179c66adb969627a35a690f08b179",
+                        "measured_at": "2026-10-02T09:32:46.527815+00:00",
+                        "rank": 1
+                      }
+                    },
+                    {
+                      "tier": "designs",
+                      "case": "router",
+                      "variant": "resilience_challenge",
+                      "source": "pr24",
+                      "delay": 68761,
+                      "legal": true,
+                      "reasons": [],
+                      "solver_wall_s": 8.238064300006954,
+                      "solver_cpu_s": 24.203125,
+                      "independent_validation_s": 0.14851199999975506,
+                      "runtime_s": 8.386576300006709,
+                      "sha256": "81cfa97ac425a14b69060ee28400709160b88b751bf2d06a6cf09cdafac52fd4",
+                      "source_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                      "exe_sha256": "62ecc2d8bfda88da565842e77fb1b0581463851ed50f38daf044f9ca16d52703",
+                      "measured_at": "2026-10-02T10:03:32.798947+00:00"
+                    }
+                  ],
+                  "stage_runtime_s": 0.42550699999264907,
+                  "measured_at": "2026-10-02T10:07:58.639621+00:00"
+                },
+                {
+                  "tier": "designs",
+                  "case": "router",
+                  "variant": "adversarial_mixed/coordinated_refinement",
+                  "source": "coordinated_refinement",
+                  "delay": 68763,
+                  "legal": true,
+                  "reasons": [],
+                  "solver_wall_s": 4.261674699999276,
+                  "solver_cpu_s": 4.203125,
+                  "independent_validation_s": 0.2537274999922374,
+                  "runtime_s": 4.515402199991513,
+                  "sha256": "b3f161a20cb6b83c569ec31f51a75e515edce89cbf746e0d8fbe7b957a33cbe5",
+                  "source_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                  "exe_sha256": "0348e9fb19d7499a3df56e1898e0514dc572f4aecac97e342e394d00aaea11e7",
+                  "measured_at": "2026-10-02T09:52:22.333601+00:00",
+                  "rank": 1,
+                  "profile": "mixed"
+                }
+              ],
+              "stage_runtime_s": 0.5379719000047771,
+              "measured_at": "2026-10-02T10:07:59.304147+00:00"
+            },
+            "upstream_warm_starts": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "input": "PR24/submissions/designs/coordinated_refinement/router.sol.json",
+                "sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa"
+              }
+            ],
+            "reported_public_ancestry": [
+              {
+                "submission": "coordinated_refinement",
+                "author": "jay-tau",
+                "commit": "58585d7b496d505dfa35f2426df4269974e583fa",
+                "route": "submissions/designs/coordinated_refinement/router.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/router.sol.json",
+                "route_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                "route_bytes": 476711,
+                "upstream_metadata": {
+                  "sha256": "cd6fed45801bee7a5e62023e84a01a9998c9633d4b0d6c650758e85ad93a354d",
+                  "bytes": 17276,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/58585d7b496d505dfa35f2426df4269974e583fa/submissions/designs/coordinated_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns; warm_lns_refinement",
+                  "author": "Taz33m; Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "2dce21b6f8f8030dab94439cfd653260b0e45854448d4d99c31549c02220d4ae",
+                "reported_hash_matches": true
+              },
+              {
+                "submission": "warm_lns_refinement",
+                "author": "kesudh",
+                "commit": "1957ee13cd4cdcffacbc7e55a497929bb562ef30",
+                "route": "submissions/designs/warm_lns_refinement/router.sol.json",
+                "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/router.sol.json",
+                "route_sha256": "7fbe8cb65e6044e3e8afa3bd5c27958910142d90d842ae352a46aea24d9d525a",
+                "route_bytes": 476293,
+                "upstream_metadata": {
+                  "sha256": "5729d8f0e89cb585cf70ca01a5e8c80266f0306050ae15a24626298f13f28eeb",
+                  "bytes": 2559,
+                  "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/1957ee13cd4cdcffacbc7e55a497929bb562ef30/submissions/designs/warm_lns_refinement/meta.json"
+                },
+                "declared_upstream": {
+                  "submission": "pathfinder_lns",
+                  "author": "Tazeem Mahashin; kesudh"
+                },
+                "reported_route_sha256": "7fbe8cb65e6044e3e8afa3bd5c27958910142d90d842ae352a46aea24d9d525a",
+                "reported_hash_matches": true
+              }
+            ]
           },
           "steps": [],
-          "parents_considered": 15
+          "parents_considered": 13
         },
-        "seed": 20261004
+        "seed": 20261005
       }
     }
   ],
@@ -216,7 +630,7 @@
     "exact A* and bounded group refinement": 3
   },
   "derived_from": {
-    "submission": "leonid-popryho",
-    "author": "Leonid Popryho"
+    "submission": "pathfinder_lns; warm_lns_refinement",
+    "author": "Taz33m; Tazeem Mahashin; kesudh"
   }
 }

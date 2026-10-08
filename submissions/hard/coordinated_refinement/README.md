@@ -2,32 +2,31 @@
 
 By [jay-tau](https://github.com/jay-tau).
 
-All 45 routes are legal in the captured snapshot. Relative to the strongest compared public entry in each tier, 6 tier aggregates improve and 0 tie. Only 27 cases strictly improve on the best audited public route for that case; the other 18 retain that delay. The larger changes from the previous PR24 snapshot also include other authors' improvements and are not attributed entirely to this refinement.
+All 45 routes are legal in the captured snapshot. Relative to the strongest compared public entry in each tier, 5 tier aggregates improve and 1 tie. Only 11 cases strictly improve on the best audited public route for that case; the other 34 retain that delay. The larger changes from the previous merged PR29 snapshot also include other authors' improvements and are not attributed entirely to this refinement.
 
-Compared public snapshot: `2026-10-03T19:03:01.012628+00:00`. Selected snapshot: `2026-10-03T19:16:50.263917+00:00`.
+Compared public snapshot: `2026-10-05T13:46:53.920278+00:00`. Selected snapshot: `2026-10-05T14:48:49.120664+00:00`.
 
-Previous entry: [PR #24 at aaaafa1](https://github.com/partcleda/eda-3d-routing-challenge/commit/aaaafa163661f27eb09e878d87f0b98d1c482e33).
+Previous merged entry: [PR #29 on main at 2566f5f](https://github.com/partcleda/eda-3d-routing-challenge/commit/2566f5f120392182dd97db77ba7760f8bb9b0828).
 
-| Tier | Previous PR24 | Best public entry | Public aggregate | Updated aggregate | Public delay → updated | New case gains |
+| Tier | Previous merged entry | Best public entry | Public aggregate | Updated aggregate | Public delay → updated | New case gains |
 |---|---:|---|---:|---:|---:|---:|
-| intro | 1.15169569 | leonid-popryho | 1.15626643 | 1.15657709 | 339,406 → 339,328 | 8/20 |
-| hard | 1.38844885 | leonid-popryho | 1.41231731 | 1.41362123 | 142,413 → 142,321 | 4/9 |
-| scale | 1.12812438 | leonid-popryho | 1.13969984 | 1.13986584 | 531,766 → 531,688 | 7/8 |
-| stress | 1.09147416 | leonid-popryho | 1.09841680 | 1.09842523 | 1,042,322 → 1,042,314 | 1/1 |
-| congested | 1.31132971 | leonid-popryho | 1.35052988 | 1.35077876 | 476,333 → 476,231 | 4/4 |
-| designs | 1.43606004 | leonid-popryho | 1.46673439 | 1.46731109 | 204,581 → 204,497 | 3/3 |
+| intro | 1.15657709 | warm_lns_refinement | 1.15669142 | 1.15670876 | 339,284 → 339,274 | 4/20 |
+| hard | 1.41362123 | warm_lns_refinement | 1.41368829 | 1.41368829 | 142,313 → 142,313 | 0/9 |
+| scale | 1.13986584 | warm_lns_refinement | 1.13989829 | 1.13991623 | 531,672 → 531,664 | 2/8 |
+| stress | 1.09842523 | warm_lns_refinement | 1.09842945 | 1.09843367 | 1,042,310 → 1,042,306 | 1/1 |
+| congested | 1.35077876 | warm_lns_refinement | 1.35112824 | 1.35115967 | 476,073 → 476,057 | 1/4 |
+| designs | 1.46731109 | warm_lns_refinement | 1.46865417 | 1.46891586 | 204,279 → 204,245 | 3/3 |
 
 The selected routes use these public parents, directly or through our recorded refinement steps:
 
 | Public parent | Author | Pinned commit |
 |---|---|---|
-| coordinated_refinement | jay-tau | [aaaafa1](https://github.com/partcleda/eda-3d-routing-challenge/commit/aaaafa163661f27eb09e878d87f0b98d1c482e33) |
-| drama3d-portfolio | YJ Kim | [1f3d020](https://github.com/partcleda/eda-3d-routing-challenge/commit/1f3d020c70068fb1198469033709fae48c53bf21) |
-| leonid-popryho | Leonid Popryho | [9d9589c](https://github.com/partcleda/eda-3d-routing-challenge/commit/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9) |
+| coordinated_refinement | jay-tau | [2566f5f](https://github.com/partcleda/eda-3d-routing-challenge/commit/2566f5f120392182dd97db77ba7760f8bb9b0828) |
+| warm_lns_refinement | kesudh | [91ebf3e](https://github.com/partcleda/eda-3d-routing-challenge/commit/91ebf3e500c018bab5c43cb415fd904c189333d0) |
 
-Including inherited declarations, the upstream entries are drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement; credited authors are Leonid Popryho; Taz33m; Tazeem Mahashin; YJ Kim; kesudh. Each tier declares its contributing entries in `derived_from`. Per-case metadata preserves exact public route URLs, commits, delays, byte sizes and SHA-256 values, plus the original metadata hash, attribution and matching case ancestry. Inherited metadata is identified as the source author's report; it is not a fresh reproduction of their router. Retained earlier versions of our entry preserve their upstream credit.
+Including inherited declarations, the upstream entries are drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement; credited authors are Leonid Popryho; Taz33m; Tazeem Mahashin; YJ Kim; kesudh. Each tier declares its contributing entries in `derived_from`. Per-case metadata preserves exact public route URLs, commits, delays, byte sizes and SHA-256 values, plus the original metadata hash, attribution and matching case ancestry. Case ancestry is excerpted without execution commands, logs or machine-specific paths. Inherited metadata is the source author's report and may describe earlier refinement stages; it is not a current checker score or a fresh reproduction of their router. Available pinned historical metadata preserves earlier versions' upstream credit.
 
-Selected route methods: exact A* and bounded group refinement: 27; retained public route: 18.
+Selected route methods: exact A* and bounded group refinement: 11; retained public route: 34.
 
 The refinement baseline uses exact root-distance-seeded A*, compact or random equal-delay choices, and bounded conflict-based or sequential group rerouting. Configuration names do not establish which move caused an improvement.
 
@@ -35,14 +34,14 @@ Earlier public routes retain their documented methods and ancestry. No from-scra
 
 Runtime files are omitted because measured refinement work excludes the compute that generated the public parent routes. No end-to-end runtime or Pareto claim is made. Route JSON is compactly serialized without changing parsed content; metadata distinguishes source-file hashes from submitted-file hashes.
 
-| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+| Case | Previous merged entry delay | Best public case | Submitted | Selected method |
 |---|---:|---:|---:|---|
-| case_01 | 8,666 | 8,542 | 8,542 | retained public route |
-| case_02 | 13,140 | 12,804 | 12,804 | retained public route |
-| case_03 | 11,062 | 10,924 | 10,924 | retained public route |
-| case_04 | 13,033 | 12,863 | 12,861 | exact A* and bounded group refinement |
-| case_05 | 15,207 | 14,987 | 14,987 | retained public route |
-| case_06 | 19,778 | 19,322 | 19,322 | retained public route |
-| case_07 | 21,283 | 20,889 | 20,887 | exact A* and bounded group refinement |
-| case_08 | 21,424 | 20,934 | 20,932 | exact A* and bounded group refinement |
-| case_09 | 21,394 | 21,072 | 21,062 | exact A* and bounded group refinement |
+| case_01 | 8,542 | 8,542 | 8,542 | retained public route |
+| case_02 | 12,804 | 12,804 | 12,804 | retained public route |
+| case_03 | 10,924 | 10,924 | 10,924 | retained public route |
+| case_04 | 12,861 | 12,861 | 12,861 | retained public route |
+| case_05 | 14,987 | 14,985 | 14,985 | retained public route |
+| case_06 | 19,322 | 19,320 | 19,320 | retained public route |
+| case_07 | 20,887 | 20,887 | 20,887 | retained public route |
+| case_08 | 20,932 | 20,932 | 20,932 | retained public route |
+| case_09 | 21,062 | 21,058 | 21,058 | retained public route |
