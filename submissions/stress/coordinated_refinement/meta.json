@@ -1,102 +1,137 @@
 {
   "author": "jay-tau",
   "url": "https://github.com/jay-tau",
-  "date": "2026-10-03",
-  "snapshot_at_utc": "2026-10-03T19:16:50.263917+00:00",
-  "canonical_commit": "0a8e052944432de0c657f3d45d6838394e627d63",
+  "date": "2026-10-09",
+  "snapshot_at_utc": "2026-10-09T16:13:48.105262+00:00",
+  "canonical_commit": "49b6443d9b599b77e09432c379ea7f422bdf4ffc",
   "method": "Best legal route per case from credited public parents and the selected refinements.",
-  "selection": "Lowest checker-recomputed delay; public seed retained on ties.",
-  "runtime": "Omitted: refinement trials exclude the compute that produced public parent routes.",
-  "reference_snapshot_at_utc": "2026-10-03T19:03:01.012628+00:00",
-  "reference_audit_sha256": "907353f3bd282142134065cf42092c26541d2248db24e6aaec1dc1f79912fb8e",
-  "selection_summary_sha256": "acf576648d434289f639b220308dfe44c1d2d7d0f81638c0020268d537f13728",
+  "selection": "Lowest checker-recomputed delay among measured runs; each starts from a pinned public seed.",
+  "hardware": "AMD Ryzen 9 8945HS (16 logical CPUs), 15632568 KiB RAM",
+  "threads": 1,
+  "runtime_scope": "One complete measured run per case, from reading the instance and pinned public warm start through refinement, validation and output/metadata writing. Native routing uses one CPU thread; the batch runs up to four cases concurrently on Linux 7.2.9. Compilation is completed before timing. Upstream public-route generation time is unknown and excluded; no hardware-normalized speed claim is made.",
+  "reference_snapshot_at_utc": "2026-10-09T16:05:28.678814+00:00",
+  "reference_audit_sha256": "3b32b2f1fd31b407ec2dc0a41ba7f814fc5116b2d070d62dbad1fc47ae663a02",
+  "selection_summary_sha256": "a320ea076423050d5a72573de428e820255e8903b577e5ec11d6afef3f3106eb",
   "previous_entry": {
-    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/24",
-    "commit": "aaaafa163661f27eb09e878d87f0b98d1c482e33"
+    "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/36",
+    "reference": "pr36",
+    "submission": "coordinated_refinement",
+    "commit": "845e94d6c85adfbb5b5bb1c8773a52b28aefcad6"
   },
   "comparisons": {
-    "previous_pr24": {
-      "aggregate": 1.091474157063431,
-      "total_delay": 1048952,
-      "commit": "aaaafa163661f27eb09e878d87f0b98d1c482e33",
+    "previous_submitted": {
+      "aggregate": 1.0984336653535527,
+      "total_delay": 1042306,
+      "commit": "845e94d6c85adfbb5b5bb1c8773a52b28aefcad6",
       "submission": "coordinated_refinement"
     },
     "current_top": {
-      "aggregate": 1.0984168040202549,
-      "total_delay": 1042322,
-      "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-      "submission": "leonid-popryho"
+      "aggregate": 1.0985980904860144,
+      "total_delay": 1042150,
+      "commit": "74af7256d17747a545c45e524d29e72e5801e755",
+      "submission": "warm_lns_refinement"
     }
   },
-  "aggregate": 1.0984252346221963,
-  "total_delay": 1042314,
+  "aggregate": 1.0986065238710272,
+  "total_delay": 1042142,
   "cases": [
     {
       "case": "case_01",
       "case_sha256": "125f9d4d871a727418cafe4ce68dda4dc93a40c6c631daaf45fa9a9c73fae550",
-      "previous_pr24_delay": 1048952,
-      "current_top_delay": 1042322,
-      "best_public_case_delay": 1042322,
-      "total_delay": 1042314,
+      "previous_submitted_delay": 1042306,
+      "current_top_delay": 1042150,
+      "best_public_case_delay": 1042150,
+      "total_delay": 1042142,
       "strict_improvement_vs_best_public_case": true,
-      "route_sha256": "c85dd4867373786c4f956f28fa33ecc70eca782cb53d5ba9455fbdc71251761c",
-      "route_bytes": 7452357,
-      "selected_input_sha256": "a2c1a82d2d9a317021563658879a11d56b6f49fafc6c0df55b6e4f2ab251d420",
-      "selected_input_bytes": 29625836,
+      "route_sha256": "845f08c4a08608231f0c783f51f2bd3607bb4efdbc43f8ec3be1f18e92dd7a70",
+      "route_bytes": 29311243,
+      "selected_input_sha256": "845f08c4a08608231f0c783f51f2bd3607bb4efdbc43f8ec3be1f18e92dd7a70",
+      "selected_input_bytes": 29311243,
       "method": "exact A* and bounded group refinement",
+      "runtime_s": 34.6448978039989,
       "provenance": {
-        "route_sha256": "a2c1a82d2d9a317021563658879a11d56b6f49fafc6c0df55b6e4f2ab251d420",
-        "route_bytes": 29625836,
-        "total_delay": 1042314,
-        "experiment": "baseline-v3",
-        "metadata_sha256": "3194897c01bb7bb4e0fca1442ce7fde8b7980b9b5fb6cc12be3ad340bc3ac0b5",
+        "route_sha256": "845f08c4a08608231f0c783f51f2bd3607bb4efdbc43f8ec3be1f18e92dd7a70",
+        "route_bytes": 29311243,
+        "total_delay": 1042142,
+        "experiment": "incumbent-v7",
+        "metadata_sha256": "0e51890facdd19fb76e702a4578cc9ee4c2be619f115c00ea74cb0cf1c915062",
         "source_code_sha256": {
           "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
-          "cbs.hpp": "b33c8abba2de026320225d003133c6692fa5cabda19fb054003c2e50440ccaa0"
+          "cbs.hpp": "c30dab6c2e80232b828d7d2044b332b8176070d4a5a64037e762ecb18e754190"
+        },
+        "runtime_evidence": {
+          "runtime_s": 34.6448978039989,
+          "measurement": "harness_wall_time_s",
+          "native_stage_runtime_s": 30.035780441998213,
+          "batch_workers": 4,
+          "manifest_sha256": "5b85d00a50975178cc063f1d81a1abf14bb4a6080cb396e91886aa571e50a793",
+          "metadata_sha256": "0e51890facdd19fb76e702a4578cc9ee4c2be619f115c00ea74cb0cf1c915062",
+          "runner_log_sha256": "a0354d4c1518dda7d7a9cfb74f7885549f19f16af9fad58c9201c66b0248820d",
+          "output_sha256": "845f08c4a08608231f0c783f51f2bd3607bb4efdbc43f8ec3be1f18e92dd7a70",
+          "binary_sha256": "0515f23f0c1614346286479b735a7a8d0fada4f97f4819de193323bd1a780dbf",
+          "source_sha256": {
+            "cbs.hpp": "c30dab6c2e80232b828d7d2044b332b8176070d4a5a64037e762ecb18e754190",
+            "cbs_check.cpp": "683f7780b9505e949b5e10cfc88354454cd707bab93094d59134965a807de4ed",
+            "core_check.cpp": "349f8a9b90521e9d45d91356118a5f6237cdbd43f2a2c8ef5b9729e6c6b05870",
+            "router.cpp": "f342c85fad73bdfe5743392c5510aaa27345bd5a1f98f6e143acbcb1129768ef",
+            "solve.py": "f24ab1c37a52a4e7dd82d55cd2f249bcdb9f6b369798daa9a232aa58c5d56e32"
+          },
+          "seed": 20261009,
+          "search_budget_s": 30.0
         },
         "method": "exact A* and bounded group refinement",
         "start": {
-          "route_sha256": "c2244743a16cf1d61cf9042b048e5f6796274ad6e53196ae33afc6d47da11b88",
-          "route_bytes": 7460608,
-          "total_delay": 1042322,
-          "experiment": "crossover-public",
-          "metadata_sha256": "b8e1d509d569a6ac71ff86dfff03d58ab86f986e09552e1d5ebf5d46585b8125",
-          "source_code_sha256": {
-            "crossover.py": "020095702f34ddba68e195eeb7b1373c3df5551d76df2489eeaa069369fffbd5"
-          },
-          "method": "minimum-cut crossover",
-          "start": {
-            "route_sha256": "04e672c4d0bca6334a462ac0d019992623de0aeb01a34522a90cae5f96507589",
-            "route_bytes": 7460607,
-            "total_delay": 1042322,
-            "method": "retained public route",
-            "submission": "leonid-popryho",
-            "author": "Leonid Popryho",
-            "commit": "9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9",
-            "route": "submissions/stress/leonid-popryho/case_01.sol.json",
-            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/stress/leonid-popryho/case_01.sol.json",
-            "upstream_attribution": {
+          "route_sha256": "88597c38449bfb3ead7073b236d59476cdab2fdddd6c082e3cf23a3d4932992a",
+          "route_bytes": 7399988,
+          "total_delay": 1042150,
+          "method": "retained public route",
+          "submission": "warm_lns_refinement",
+          "author": "kesudh",
+          "commit": "74af7256d17747a545c45e524d29e72e5801e755",
+          "route": "submissions/stress/warm_lns_refinement/case_01.sol.json",
+          "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/74af7256d17747a545c45e524d29e72e5801e755/submissions/stress/warm_lns_refinement/case_01.sol.json",
+          "upstream_attribution": {
+            "author": "kesudh",
+            "method": "Exact shortest-path-tree warm refinement of published routes. Radix/A* trees with feasible per-sink bounds, neutral and group reroutes, preserved-route and displacement-chain repair, bounded excursions, and a multi-worker CPU search portfolio; the opt-in chain-fast modes specialize congestion pricing. Two-parent minimum-cut crossover follows the coordinated_refinement line of work by jay-tau (PR #24). Bounded conflict-based search over static vertex-disjoint multi-sink trees is an adaptation of Sharon et al. (see algorithm_references). This entry's own GPU kernels are audited prototypes and did not generate these routes.",
+            "derived_from": {
+              "submission": "leonid-popryho",
               "author": "Leonid Popryho",
-              "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries"
-            },
-            "upstream_metadata": {
-              "sha256": "45e72bff5b7e78fac43f8e956ca25da5919b321baed6062d8521056d134088c2",
-              "bytes": 168,
-              "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/9d9589cd4e2e9e5fafcb67a2f698f6f7d4be64c9/submissions/stress/leonid-popryho/meta.json"
+              "ref": "pull/46 head 2d36fd1e",
+              "commit": "2d36fd1e",
+              "also_carried_from": [],
+              "warm_start_policy": "Every case refined here was warm-started from the best published route for that case available at run time; the entries listed below publish those routes, directly or upstream.",
+              "upstream_chain": "coordinated_refinement (jay-tau) builds on drama3d-portfolio (YJ Kim), leonid-popryho (Leonid Popryho) and pathfinder_lns (Tazeem Mahashin); cuda-have-been-shorter (YJ Kim) is the renamed drama3d-portfolio entry."
             }
           },
-          "steps": [],
-          "parents_considered": 12
+          "upstream_case": {
+            "tier": "stress",
+            "case": "case_01",
+            "delay": 1042150,
+            "source": "leonid-popryho",
+            "carried_from": {
+              "entry": "leonid-popryho",
+              "author": "Leonid Popryho",
+              "ref": "pull/46 head 2d36fd1e",
+              "commit": "2d36fd1e"
+            }
+          },
+          "upstream_metadata": {
+            "sha256": "36b683857e0f18adb00222c748ed524f8f76f16029d0126d4b63be2bd60a01e2",
+            "bytes": 5319,
+            "url": "https://github.com/partcleda/eda-3d-routing-challenge/blob/74af7256d17747a545c45e524d29e72e5801e755/submissions/stress/warm_lns_refinement/meta.json",
+            "note": "Source-author report, which may describe earlier stages rather than the current route; commands, logs and machine-specific paths are omitted from the case excerpt."
+          }
         },
-        "seed": 20261004
+        "seed": 20261009
       }
     }
   ],
+  "total_runtime_s": 34.6448978039989,
   "selected_methods": {
     "exact A* and bounded group refinement": 1
   },
   "derived_from": {
-    "submission": "leonid-popryho",
-    "author": "Leonid Popryho"
+    "submission": "leonid-popryho; warm_lns_refinement",
+    "author": "Leonid Popryho; kesudh"
   }
 }
