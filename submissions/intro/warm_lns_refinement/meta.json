@@ -1,167 +1,350 @@
 {
- "author": "kesudh",
- "url": "https://github.com/kesudh",
- "method": "Rust warm-start large-neighborhood search: exact per-net SPT reroute with equal-delay tie exploration, group rip-up with negotiated-congestion rounds (PathFinder-style history/present costs), bounded threshold acceptance; every accepted state re-verified by the repository checker.",
- "date": "2026-10-01",
- "warm_start": {
-  "author": "Taz33m",
-  "submission": "pathfinder_lns",
-  "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
-  "commit": "4e21227"
- },
- "upstream_credit": {
-  "author": "Taz33m",
-  "submission": "pathfinder_lns",
-  "pull_request": "https://github.com/partcleda/eda-3d-routing-challenge/pull/3",
-  "commit": "4e21227867ee1f8f72c9f4d9ad446e05c20fe452",
-  "note": "Warm starts are PR#3's routes at head 4e21227, the version that led all six tier aggregates before this refinement."
- },
- "selection": "Lowest checker-recomputed delay across the warm start and every refinement run; the warm-start route is retained verbatim (identical sha256) on cases with no strict win.",
- "runtime": "Per-case wall seconds of the incremental refinement only; excludes warm-start generation.",
- "tier": "intro",
- "aggregate": 1.15087837,
- "warm_start_aggregate": 1.15082522,
- "legal": "20/20",
- "cases": [
-  {
-   "case": "case_01",
-   "warm_start_delay": 206,
-   "total_delay": 206,
-   "delta": 0,
-   "method": "own earlier route (ties PR#3)"
+  "author": "kesudh",
+  "date": "2026-10-08",
+  "method": "Exact shortest-path-tree warm refinement of published routes. Radix/A* trees with feasible per-sink bounds, neutral and group reroutes, preserved-route and displacement-chain repair, bounded excursions, and a multi-worker CPU search portfolio; the opt-in chain-fast modes specialize congestion pricing. Two-parent minimum-cut crossover follows the coordinated_refinement line of work by jay-tau (PR #24). Bounded conflict-based search over static vertex-disjoint multi-sink trees is an adaptation of Sharon et al. (see algorithm_references). This entry's own GPU kernels are audited prototypes and did not generate these routes.",
+  "derived_from": {
+    "submission": "coordinated_refinement",
+    "author": "jay-tau",
+    "ref": "pull/36 head 845e94d6",
+    "commit": "845e94d6c85a",
+    "also_carried_from": [
+      {
+        "entry": "cuda-have-been-shorter",
+        "author": "YJ Kim",
+        "ref": "origin/main",
+        "commit": "2d321cdb5e2f",
+        "routes": 1
+      },
+      {
+        "entry": "leonid-popryho",
+        "author": "Leonid Popryho",
+        "ref": "pull/46 head 2d36fd1e",
+        "commit": "2d36fd1ec432",
+        "routes": 1
+      }
+    ],
+    "warm_start_policy": "Every case refined here was warm-started from the best published route for that case available at run time; the entries listed below publish those routes, directly or upstream.",
+    "upstream_chain": "coordinated_refinement (jay-tau) builds on drama3d-portfolio (YJ Kim), leonid-popryho (Leonid Popryho) and pathfinder_lns (Tazeem Mahashin); cuda-have-been-shorter (YJ Kim) is the renamed drama3d-portfolio entry."
   },
-  {
-   "case": "case_02",
-   "warm_start_delay": 1030,
-   "total_delay": 1030,
-   "delta": 0,
-   "method": "own earlier route (ties PR#3)"
-  },
-  {
-   "case": "case_03",
-   "warm_start_delay": 1611,
-   "total_delay": 1611,
-   "delta": 0,
-   "method": "own earlier route (ties PR#3)"
-  },
-  {
-   "case": "case_04",
-   "warm_start_delay": 1980,
-   "total_delay": 1980,
-   "delta": 0,
-   "method": "own earlier route (ties PR#3)"
-  },
-  {
-   "case": "case_05",
-   "warm_start_delay": 3687,
-   "total_delay": 3687,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_06",
-   "warm_start_delay": 5189,
-   "total_delay": 5189,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_07",
-   "warm_start_delay": 5267,
-   "total_delay": 5263,
-   "delta": 4,
-   "method": "refined (rust LNS)"
-  },
-  {
-   "case": "case_08",
-   "warm_start_delay": 7487,
-   "total_delay": 7487,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_09",
-   "warm_start_delay": 8144,
-   "total_delay": 8144,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_10",
-   "warm_start_delay": 10551,
-   "total_delay": 10551,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_11",
-   "warm_start_delay": 12200,
-   "total_delay": 12198,
-   "delta": 2,
-   "method": "refined (rust LNS)"
-  },
-  {
-   "case": "case_12",
-   "warm_start_delay": 16093,
-   "total_delay": 16093,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_13",
-   "warm_start_delay": 19593,
-   "total_delay": 19593,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_14",
-   "warm_start_delay": 21197,
-   "total_delay": 21197,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_15",
-   "warm_start_delay": 23938,
-   "total_delay": 23938,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_16",
-   "warm_start_delay": 32866,
-   "total_delay": 32866,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_17",
-   "warm_start_delay": 41622,
-   "total_delay": 41622,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_18",
-   "warm_start_delay": 44601,
-   "total_delay": 44601,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_19",
-   "warm_start_delay": 40024,
-   "total_delay": 40024,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
-  },
-  {
-   "case": "case_20",
-   "warm_start_delay": 44726,
-   "total_delay": 44726,
-   "delta": 0,
-   "method": "PR#3 route verbatim"
+  "runtime": "4 worker threads; see runtime_scope",
+  "runtime_hardware": "Windows, Intel i7-13700HX, 16 cores/24 threads; actual worker count recorded per command; concurrent Hermes and benchmark workloads. Observed wall times, not normalized.",
+  "selection": "The best independently legal output per case, as reported by the official checker; ties keep the earlier route. Timed multiworker search is nondeterministic, so a repeat can return a different legal route.",
+  "cases": [
+    {
+      "tier": "intro",
+      "case": "case_01",
+      "delay": 206,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_02",
+      "delay": 1030,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_03",
+      "delay": 1611,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_04",
+      "delay": 1980,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_05",
+      "delay": 3677,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_06",
+      "delay": 5175,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "origin/main",
+        "commit": "b13a8290d052"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_07",
+      "delay": 5239,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "origin/main",
+        "commit": "b13a8290d052"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_08",
+      "delay": 7447,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/36 head 845e94d6",
+        "commit": "845e94d6c85a"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_09",
+      "delay": 8134,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_10",
+      "delay": 10487,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_11",
+      "delay": 12158,
+      "source": "own_refinement"
+    },
+    {
+      "tier": "intro",
+      "case": "case_12",
+      "delay": 16035,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "origin/main",
+        "commit": "b13a8290d052"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_13",
+      "delay": 19397,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/47 head cb435d0a",
+        "commit": "cb435d0a7559"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_14",
+      "delay": 21063,
+      "source": "leonid-popryho",
+      "carried_from": {
+        "entry": "leonid-popryho",
+        "author": "Leonid Popryho",
+        "ref": "pull/46 head 2d36fd1e",
+        "commit": "2d36fd1ec432"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_15",
+      "delay": 23630,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/36 head 845e94d6",
+        "commit": "845e94d6c85a"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_16",
+      "delay": 32604,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/36 head 845e94d6",
+        "commit": "845e94d6c85a"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_17",
+      "delay": 41166,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/36 head 845e94d6",
+        "commit": "845e94d6c85a"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_18",
+      "delay": 44153,
+      "source": "cuda-have-been-shorter",
+      "carried_from": {
+        "entry": "cuda-have-been-shorter",
+        "author": "YJ Kim",
+        "ref": "origin/main",
+        "commit": "2d321cdb5e2f"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_19",
+      "delay": 39636,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/47 head cb435d0a",
+        "commit": "cb435d0a7559"
+      }
+    },
+    {
+      "tier": "intro",
+      "case": "case_20",
+      "delay": 44268,
+      "source": "coordinated_refinement",
+      "carried_from": {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/47 head cb435d0a",
+        "commit": "cb435d0a7559"
+      }
+    }
+  ],
+  "algorithm_references": [
+    {
+      "method": "conflict splitting, adapted to static vertex-disjoint multi-sink trees",
+      "citation": "Sharon, Stern, Felner and Sturtevant, Conflict-based search for optimal multi-agent pathfinding",
+      "url": "https://doi.org/10.1016/j.artint.2014.11.006"
+    }
+  ],
+  "tier": "intro",
+  "hardware": "13th Gen Intel Core i7-13700HX (16 cores / 24 threads), 31.7 GB RAM, Windows 11",
+  "threads": 4,
+  "runtime_scope": "Per case, `runtime.json` reports the wall-clock seconds of one end-to-end run of this entry's router on that case: the benchmark instance in, the shipped route as the warm start, a refined .sol.json out, at a fixed 30 s search budget on 4 worker threads (chain-fast mode). The engine self-reports the elapsed time and that number is recorded. All 45 cases were measured the same way, so the column is uniform. Where the shipped bytes are another entry's file carried verbatim, the reported time is this entry's own run on that instance, not the upstream author's generation time, which is not claimed. Several cases were measured concurrently, so wall-clock values are conservative.",
+  "attribution": {
+    "carried_routes": [
+      {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "origin/main",
+        "commit": "b13a8290d052",
+        "merged": true,
+        "routes_carried_verbatim": 3,
+        "cases": [
+          "case_06",
+          "case_07",
+          "case_12"
+        ]
+      },
+      {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/36 head 845e94d6",
+        "commit": "845e94d6c85a",
+        "merged": false,
+        "routes_carried_verbatim": 4,
+        "cases": [
+          "case_08",
+          "case_15",
+          "case_16",
+          "case_17"
+        ]
+      },
+      {
+        "entry": "coordinated_refinement",
+        "author": "jay-tau",
+        "ref": "pull/47 head cb435d0a",
+        "commit": "cb435d0a7559",
+        "merged": false,
+        "routes_carried_verbatim": 3,
+        "cases": [
+          "case_13",
+          "case_19",
+          "case_20"
+        ]
+      },
+      {
+        "entry": "cuda-have-been-shorter",
+        "author": "YJ Kim",
+        "ref": "origin/main",
+        "commit": "2d321cdb5e2f",
+        "merged": true,
+        "routes_carried_verbatim": 1,
+        "cases": [
+          "case_18"
+        ]
+      },
+      {
+        "entry": "leonid-popryho",
+        "author": "Leonid Popryho",
+        "ref": "pull/46 head 2d36fd1e",
+        "commit": "2d36fd1ec432",
+        "merged": false,
+        "routes_carried_verbatim": 1,
+        "cases": [
+          "case_14"
+        ]
+      }
+    ],
+    "warm_starts": {
+      "policy": "Every case refined here was warm-started from the best published route for that case available at run time; the entries listed below publish those routes, directly or upstream.",
+      "entries": [
+        {
+          "entry": "coordinated_refinement",
+          "author": "jay-tau",
+          "ref": "pull/47 head cb435d0a",
+          "commit": "cb435d0a7559",
+          "merged": false,
+          "used_as": "adoption base and warm start for this session's refinement"
+        },
+        {
+          "entry": "coordinated_refinement",
+          "author": "jay-tau",
+          "ref": "pull/36 head 845e94d6",
+          "commit": "845e94d6c85a",
+          "merged": false,
+          "used_as": "warm start for the cases this entry refined earlier"
+        },
+        {
+          "entry": "drama3d-portfolio",
+          "author": "YJ Kim",
+          "ref": "origin/main (entry renamed cuda-have-been-shorter)",
+          "commit": "2d321cdb5e2f",
+          "merged": true,
+          "used_as": "upstream of the coordinated_refinement routes"
+        },
+        {
+          "entry": "pathfinder_lns",
+          "author": "Tazeem Mahashin",
+          "ref": "origin/main",
+          "commit": "c2d9d9f583d2",
+          "merged": true,
+          "used_as": "upstream route source"
+        },
+        {
+          "entry": "leonid-popryho",
+          "author": "Leonid Popryho",
+          "ref": "pull/46 head 2d36fd1e",
+          "commit": "2d36fd1ec432",
+          "merged": false,
+          "used_as": "upstream route source"
+        }
+      ]
+    },
+    "upstream_chain": "coordinated_refinement (jay-tau) builds on drama3d-portfolio (YJ Kim), leonid-popryho (Leonid Popryho) and pathfinder_lns (Tazeem Mahashin); cuda-have-been-shorter (YJ Kim) is the renamed drama3d-portfolio entry.",
+    "note": "Byte-verified: each shipped route is compared with every published entry's file. Ids recorded above are the ref the bytes were taken from, so an open PR is not confused with the merged entry of the same name."
   }
- ]
 }
