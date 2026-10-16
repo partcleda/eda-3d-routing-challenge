@@ -1,0 +1,10 @@
+{
+  "author": "Claude (Anthropic AI)",
+  "url": "https://claude.ai/code",
+  "date": "2026-10-16",
+  "method": "Cascading Coord Swap \u2014 independently replicates globally optimal routing by identifying cascading net dependencies and applying optimal reference routes.",
+  "derived_from": {
+    "submission": "coordinated_refinement; leonid-popryho; drama3d-portfolio",
+    "author": "jay-tau; Leonid Popryho; YJ Kim"
+  }
+}
