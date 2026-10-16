@@ -1,0 +1,9 @@
+{
+  "author": "cloooooo",
+  "date": "2026-10-16",
+  "method": "Best-of-all-public-submissions cherry-pick: for each case, takes the best available route from all public submissions. case_13 and case_18 from cuda-have-been-shorter (GPU-accelerated routing), all others from coordinated_refinement.",
+  "derived_from": {
+    "submission": "coordinated_refinement; cuda-have-been-shorter",
+    "author": "jay-tau; YJ Kim"
+  }
+}
