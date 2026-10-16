@@ -1,0 +1,9 @@
+{
+  "author": "cloooooo",
+  "date": "2026-10-16",
+  "method": "Best-of-all-public-submissions with diversity injection optimization. ctrl and int2float from coordinated_refinement. router improved from 67503 to 67501 via diversity-injection perturbation search.",
+  "derived_from": {
+    "submission": "coordinated_refinement",
+    "author": "jay-tau"
+  }
+}
