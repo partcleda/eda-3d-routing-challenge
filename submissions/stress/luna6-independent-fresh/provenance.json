@@ -1,0 +1,126 @@
+{
+  "cases": {
+    "case_01": {
+      "benchmark_sha256": "cb28695a17f16456eefdf62deea0e76168de5e2228cd1392f43f5edb485b1d01",
+      "execution_record": {
+        "case": "case_01",
+        "command": [
+          "C:\\Users\\James\\Downloads\\EDA\\m2_3-campaign-20261011\\.venv\\Scripts\\python.exe",
+          "C:\\Users\\James\\Downloads\\EDA\\public-m3d-router\\run_suite.py",
+          "--worker-task",
+          "C:\\Users\\James\\Downloads\\EDA\\m2_4-regional-pilot-v2\\production\\runs\\stress\\runs\\case_01-seed20261012-af294563ce78\\task.json"
+        ],
+        "concurrent_worker_processes_at_launch": 1,
+        "end_to_end_wall_seconds": 395.47199920000276,
+        "entrypoint": "public-m3d-router/run_suite.py --worker-task",
+        "hardware": {
+          "description": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics (8 physical cores, 16 logical threads), Microsoft Windows 11 Pro Insider Preview, version 10.0.26340, 16440479744 bytes RAM (15.31 GiB), CPU-only",
+          "gpu_used": false,
+          "logical_cpus": 16,
+          "physical_cores": 8,
+          "platform": "Microsoft Windows 11 Pro Insider Preview, version 10.0.26340",
+          "processor": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics",
+          "ram_bytes": 16440479744
+        },
+        "input_benchmark_sha256": "cb28695a17f16456eefdf62deea0e76168de5e2228cd1392f43f5edb485b1d01",
+        "official_validation": {
+          "baseline_total": 1144904,
+          "checker_sha256": "27a38b88ca8f114e27551f4e2abf6621c8fa4e2feebd64e0722747f57d6ed564",
+          "legal": true,
+          "score_ratio": 1.0744360380110098,
+          "scorer_sha256": "0f98c56ff0439dfe6383d1216e43265d954a424edbc9e6bed8ae3666b3b56da3",
+          "total_delay": 1065586
+        },
+        "parent_checkpoints": [],
+        "parent_sampled_cpu_seconds": 0.0,
+        "peak_working_set_bytes": 4419584,
+        "producer_finish_utc": "2026-10-12T23:17:46.636321+00:00",
+        "producer_id": "case_01-seed20261012-af294563ce78",
+        "producer_start_utc": "2026-10-12T23:11:11.163686+00:00",
+        "production_ancestry": [
+          {
+            "sha256": "cb28695a17f16456eefdf62deea0e76168de5e2228cd1392f43f5edb485b1d01",
+            "type": "raw_benchmark"
+          }
+        ],
+        "random_seeds": [
+          20261012
+        ],
+        "route_sha256": "5bb2b4eb5436b27f704d8a063b3f51d12c8c87f61f978b5bd130212e5c50e53a",
+        "route_write_utc": "2026-10-12T23:17:46.213997+00:00",
+        "router_configuration": {
+          "budget_seconds": 45.0,
+          "lns": {
+            "T0": 50,
+            "T1": 2,
+            "max_set": 6,
+            "p_seq": 0.2
+          },
+          "slow_negotiation": {
+            "fan_exp": 0.5,
+            "hist_fac": 0.05,
+            "max_iters": 8000,
+            "mult": 1.03,
+            "pres0": 0.05,
+            "pres_max": 3,
+            "vcost": 3.0
+          }
+        },
+        "runtime_scope": "parent monotonic launch-to-worker-exit; worker includes imports, input loading, routing, final checker and route write",
+        "schema": "m3d-route-production-record-v1",
+        "seed": 20261012,
+        "source_commit": "81e4729b7c17c40987a8f57436fa94b9cb1ece96",
+        "source_dirty": true,
+        "source_files_sha256": {
+          "core.py": "6007addffd1828759521be25d04a30977957f79e815b5cab36a59c681ecd455f",
+          "pack_submission.py": "9a44072c9200bceae0e4c364d821b155d88c03df14ff5bfdbb622c5f2215bef2",
+          "router.py": "5d99dc8dcad802f7fb1b38e7c715bb8bdf17fc8816b658743b3b39183bbfadf3",
+          "run_suite.py": "f7f0564bf4c51fd7a1ab204c679159ab3cc32052e4f78fbea210803350e4d3a2"
+        },
+        "threads": 1,
+        "worker_process_cpu_seconds": 377.65625
+      },
+      "execution_record_sha256": "0a31f6ef004e17f3f233ade699aa5d2e911a7d2c17006ee2da68a244c2269274",
+      "producer_run_directory": "m2_4-regional-pilot-v2/production/runs/stress/runs/case_01-seed20261012-af294563ce78",
+      "route_sha256": "5bb2b4eb5436b27f704d8a063b3f51d12c8c87f61f978b5bd130212e5c50e53a",
+      "selected_pointer": {
+        "case": "case_01",
+        "execution_path": "runs/case_01-seed20261012-af294563ce78/execution.json",
+        "execution_sha256": "0a31f6ef004e17f3f233ade699aa5d2e911a7d2c17006ee2da68a244c2269274",
+        "route_path": "runs/case_01-seed20261012-af294563ce78/candidate.sol.json",
+        "route_sha256": "5bb2b4eb5436b27f704d8a063b3f51d12c8c87f61f978b5bd130212e5c50e53a",
+        "run_id": "case_01-seed20261012-af294563ce78",
+        "schema": "m3d-selected-route-v1",
+        "total_delay": 1065586
+      },
+      "selected_pointer_sha256": "ffdd76635c4ada01237d10a964f9623d67cf9201477c440f67ef1aeb88a3f3b7",
+      "source_snapshot_sha256": "7d6122a6611cd0dacce40187807bdd90b6ea4900968d51a034a8c774ebed4e85"
+    }
+  },
+  "official_score": {
+    "aggregate_score": 1.0744360380110098,
+    "cases": [
+      {
+        "baseline_delay": 1144904,
+        "case": "case_01",
+        "legal": true,
+        "ratio": 1.0744360380110098,
+        "reasons": [],
+        "runtime_s": null,
+        "total_delay": 1065586
+      }
+    ],
+    "complete": true,
+    "format": "m3d-leaderboard",
+    "formula": "aggregate = geomean_c(baseline_total_c / submission_total_c); higher is better; baseline scores 1.0; all cases must be legal for a complete ranked submission (else aggregate = 0.0)",
+    "n_cases": 1,
+    "n_legal": 1
+  },
+  "schema": "m3d-route-runtime-binding-v1",
+  "source_snapshot_sha256_set": [
+    "7d6122a6611cd0dacce40187807bdd90b6ea4900968d51a034a8c774ebed4e85"
+  ],
+  "submission": "luna6-independent-fresh",
+  "suite_sha256": "e4006f2bfd40ef237ad70873e4ec3d0268c3d9e0130568a92a8d47f41832ef1b",
+  "tier": "stress"
+}

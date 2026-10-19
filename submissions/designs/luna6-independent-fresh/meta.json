@@ -1,0 +1,8 @@
+{
+ "author": "James (IrwinJam)",
+ "url": "https://github.com/IrwinJam/m3d-router/tree/81e4729b7c17c40987a8f57436fa94b9cb1ece96",
+ "method": "Partcl M3D challenge's MIT-licensed negotiated reference router generates a legal in-memory seed directly from the raw benchmark; the local source-aware optimizer then applies hard refinement and bounded large-neighborhood search in the same measured run. No precomputed solution route is read.",
+ "date": "2026-10-13",
+ "hardware": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics (8 physical cores, 16 logical threads), Microsoft Windows 11 Pro Insider Preview, version 10.0.26340, 16440479744 bytes RAM (15.31 GiB), CPU-only",
+ "threads": 1
+}
