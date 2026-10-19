@@ -1,0 +1,8 @@
+{
+ "author": "Dev",
+ "url": "https://github.com/Dev077/kappa",
+ "method": "rip-up and reroute from a negotiated-congestion start: neighbourhoods of detoured nets are rerouted one net at a time, choosing among 7 routing modes by a search guided by a ~10M-parameter CNN + net-interaction network; a reroute is kept only if delay does not increase; up to 20 min per case on one worker",
+ "date": "2026-10-15",
+ "hardware": "AMD EPYC 9B45 (48 threads), NVIDIA RTX PRO 6000 Blackwell Server Edition, 177 GB RAM (Colab G4)",
+ "threads": 44
+}
