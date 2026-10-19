@@ -1,5 +1,7 @@
 {
  "author": "Leonid Popryho",
- "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries",
- "date": "2026-10-03"
+ "method": "Own router (method not disclosed); every route comes from one from-scratch run on the raw instance, no warm starts from any other entry or earlier solution",
+ "date": "2026-10-08",
+ "hardware": "AMD Ryzen Threadripper PRO 9975WX (32 cores / 64 threads), 256 GB RAM",
+ "threads": 16
 }
