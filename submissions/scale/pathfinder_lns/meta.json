@@ -1,5 +1,7 @@
 {
  "author": "Tazeem Mahashin",
- "method": "C++ PathFinder negotiation (fanout-weighted congestion) + exact per-net reroute + region/warm-repair LNS",
- "date": "2026-09-30"
+ "method": "Own router (method not disclosed)",
+ "date": "2026-10-16",
+ "hardware": "Apple M5 Pro; 48 GiB RAM; macOS-27.0-arm64-arm-64bit",
+ "threads": 1
 }
