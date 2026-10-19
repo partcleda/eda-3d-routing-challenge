@@ -67,26 +67,14 @@ class TestRuntimeOnLeaderboard(unittest.TestCase):
     def _row(self, md, name):
         return [l for l in md.splitlines() if l.startswith("| ") and f"| {name} |" in l][0]
 
-    def test_missing_runtime_is_shown_and_still_ranked_before_deadline(self):
+    def test_untimed_entries_are_unranked(self):
         with tempfile.TemporaryDirectory() as tmp:
             md = cli._render_leaderboard_md(self._root(tmp))
+            self.assertIn("| 1.0000 |", self._row(md, "timed"))
             row = self._row(md, "untimed")
+            self.assertTrue(row.startswith("| 2 |"))
             self.assertIn("| missing |", row)
-            self.assertIn("| 1.0000 |", row)
-
-    def test_enforced_runtime_unranks_untimed_entries(self):
-        old = cli.ENFORCE_RUNTIME
-        cli.ENFORCE_RUNTIME = True
-        try:
-            with tempfile.TemporaryDirectory() as tmp:
-                md = cli._render_leaderboard_md(self._root(tmp))
-                self.assertIn("| 1.0000 |", self._row(md, "timed"))
-                row = self._row(md, "untimed")
-                self.assertTrue(row.startswith("| 2 |"))
-                self.assertIn("| — |", row)
-        finally:
-            cli.ENFORCE_RUNTIME = old
-
+            self.assertIn("| — |", row)
 
 if __name__ == "__main__":
     unittest.main()

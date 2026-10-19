@@ -413,11 +413,9 @@ def _load_verification(root: str) -> Dict[str, str]:
 
 # Every ranked entry must report runtime: runtime.json with the wall-clock seconds
 # of one run per case, and `hardware` + `threads` in meta.json. CI enforces this
-# for new and updated submissions. Entries already on the board have until
-# RUNTIME_DEADLINE; on that date a maintainer sets ENFORCE_RUNTIME = True and
-# entries still without a full runtime.json drop to unranked.
-RUNTIME_DEADLINE = "2026-10-15"
-ENFORCE_RUNTIME = False
+# for new and updated submissions; entries without a full runtime.json are
+# unranked (the grace period for older entries ended on 2026-10-15).
+ENFORCE_RUNTIME = True
 
 
 def _render_leaderboard_body(root: str, heading: str = "##") -> List[str]:
@@ -481,10 +479,11 @@ def _render_leaderboard_body(root: str, heading: str = "##") -> List[str]:
 _LEGEND = ["Ranked per tier (each tier is normalized to its own baseline, so a",
            "**higher aggregate is better** and the baseline itself scores 1.0000).",
            "`✓` marks submissions on the runtime-vs-total-delay Pareto frontier;",
-           "`†` marks derivative entries that start from another entry's routes.",
+           "`†` marks derivative entries that start from another entry's routes;",
+           "they are listed but cannot win a tier (see CONTRIBUTING.md).",
            "`runtime (s)` is the summed wall-clock time of one run per case, as",
            "reported in `runtime.json` (hardware and threads are in `meta.json`).",
-           f"It is required: entries still `missing` it on {RUNTIME_DEADLINE} become unranked.",
+           "It is required: entries `missing` it are unranked.",
            "`verified` is set by the maintainers once they have re-run an entry's",
            "router and reproduced its routes (`verification.json`); `—` means not yet."]
 
