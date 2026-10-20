@@ -1,58 +1,59 @@
 # warm_lns_refinement — intro
 
-By [kesudh](https://github.com/kesudh).
+By [kesudh](https://github.com/kesudh). Exact shortest-path-tree warm refinement of
+published routes; per-case provenance is byte-verified in `meta.json`.
 
-Warm starts are [Taz33m's pathfinder_lns, PR #3](https://github.com/partcleda/eda-3d-routing-challenge/pull/3)
-pinned to commit `4e21227867ee1f8f72c9f4d9ad446e05c20fe452` — the version that led all six tier aggregates
-before this refinement. Route geometry on retained cases is credited to Taz33m;
-gains below are incremental refinements on top, produced by a Rust warm-start
-large-neighborhood search and re-verified with `m3d/checker.py`.
+| legal | total delay | aggregate | runtime (s) |
+|---:|---:|---:|---:|
+| 20/20 | 339092 | 1.1571 | 25718.40 |
 
-| Tier | Legal | PR#3 aggregate | This aggregate | Delta | Refined | Verbatim PR#3 | Own tie |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| intro | 20/20 | 1.15082522 | 1.15087837 | +0.0046% | 2/20 | 14 | 4 |
+## Attribution
 
-## Method
+Routes carried verbatim, with the ref the shipped bytes were taken from:
 
-- **Exact per-net reroute** — root-distance Dijkstra to a shortest-path tree,
-  with random tie-breaking among equal-cost tight predecessors so plateau
-  structure is explored rather than fixed.
-- **Group rip-up rerouting** — region- and blocker-scoped groups of interacting
-  nets are ripped and rerouted jointly (Gauss-Seidel passes), which no sequence
-  of single-net reroutes can express.
-- **Negotiated-congestion rounds inside group moves** — PathFinder-style present
-  and history costs let group members transiently share resources, then an
-  escalation to a strictly-legal exact reroute legalises the state; bounded
-  threshold acceptance permits small temporary increases, best legal state kept.
-- **Multi-worker portfolio** — independent workers with different seeds share a
-  best-found state; every accepted state is re-verified before selection.
+| entry | author | ref | commit | routes |
+|---|---|---|---|---:|
+| coordinated_refinement | jay-tau | origin/main | `b13a8290d052` | 3 |
+| coordinated_refinement | jay-tau | pull/36 head 845e94d6c85a | `845e94d6c85a` | 4 |
+| coordinated_refinement | jay-tau | pull/47 head cb435d0a7559 | `cb435d0a7559` | 2 |
+| cuda-have-been-shorter | YJ Kim | origin/main | `2d321cdb5e2f` | 1 |
+| cuda-have-been-shorter | YJ Kim | pull/53 head 40dbbd8886b7 | `40dbbd8886b7` | 1 |
+| leonid-popryho | Leonid Popryho | pull/46 head 2d36fd1ec432 | `2d36fd1ec432` | 1 |
 
-Selection keeps the lowest independently checked delay per case. A case is
-labelled **verbatim** only when the submitted file is byte-identical (same
-sha256) to the credited warm start; **own tie** means the route is an earlier
-`warm_lns_refinement` route that matches PR#3's delay without being a copy of it.
+Equal-total re-derivations: case_01-case_05 ship this router's own output (not
+byte-identical to any published file), but each total equals a route another entry
+published earlier, so they are not counted as this entry's improvements:
 
-## Case provenance
+| case | total | first published by | ref | commit |
+|---|---:|---|---|---|
+| case_01 | 206 | lns_negotiated (adityuhkapoor) | origin/main | `5b5be7045786` |
+| case_02 | 1030 | pathfinder_lns (Tazeem Mahashin) | origin/main | `50f2dd7b64f4` |
+| case_03 | 1611 | pathfinder_lns (Tazeem Mahashin) | origin/main | `50f2dd7b64f4` |
+| case_04 | 1980 | pathfinder_lns (Tazeem Mahashin) | origin/main | `50f2dd7b64f4` |
+| case_05 | 3677 | drama3d-portfolio (YJ Kim) | origin/main | `921ccf12b431` |
 
-| Case | PR#3 delay | Submitted | Delta | Provenance |
-|---|---:|---:|---:|---|
-| case_01 | 206 | 206 | +0 | own earlier route (ties PR#3) |
-| case_02 | 1,030 | 1,030 | +0 | own earlier route (ties PR#3) |
-| case_03 | 1,611 | 1,611 | +0 | own earlier route (ties PR#3) |
-| case_04 | 1,980 | 1,980 | +0 | own earlier route (ties PR#3) |
-| case_05 | 3,687 | 3,687 | +0 | PR#3 route verbatim |
-| case_06 | 5,189 | 5,189 | +0 | PR#3 route verbatim |
-| case_07 | 5,267 | 5,263 | +4 | refined (rust LNS) |
-| case_08 | 7,487 | 7,487 | +0 | PR#3 route verbatim |
-| case_09 | 8,144 | 8,144 | +0 | PR#3 route verbatim |
-| case_10 | 10,551 | 10,551 | +0 | PR#3 route verbatim |
-| case_11 | 12,200 | 12,198 | +2 | refined (rust LNS) |
-| case_12 | 16,093 | 16,093 | +0 | PR#3 route verbatim |
-| case_13 | 19,593 | 19,593 | +0 | PR#3 route verbatim |
-| case_14 | 21,197 | 21,197 | +0 | PR#3 route verbatim |
-| case_15 | 23,938 | 23,938 | +0 | PR#3 route verbatim |
-| case_16 | 32,866 | 32,866 | +0 | PR#3 route verbatim |
-| case_17 | 41,622 | 41,622 | +0 | PR#3 route verbatim |
-| case_18 | 44,601 | 44,601 | +0 | PR#3 route verbatim |
-| case_19 | 40,024 | 40,024 | +0 | PR#3 route verbatim |
-| case_20 | 44,726 | 44,726 | +0 | PR#3 route verbatim |
+This entry's strictly-lower refinements in this tier: case_10, case_11, case_20.
+
+Warm starts: the 8 case(s) refined here were warm-started from the best
+published route for that case, published by coordinated_refinement (jay-tau),
+drama3d-portfolio / cuda-have-been-shorter (YJ Kim), leonid-popryho (Leonid
+Popryho) or pathfinder_lns (Tazeem Mahashin).
+
+Conflict-based search is adapted from Sharon et al. (see `algorithm_references`).
+`runtime.json`, per case:
+
+* **This entry's own routes:** the run of this router that produced the shipped file - 30 s
+  search budget, 4 worker threads, chain-fast mode, the engine's own END_TO_END_SECONDS.
+  stress/case_01 reports 44.77 s because the budget is checked only at the top of the trial
+  loop and a 901-net trial can exceed it; congested/case_01 reports 31.617 s, the run behind
+  its previous route plus a 1.55 s partition-crossover run (see the congested README).
+* **Carried routes, producer runtime published (14 files):** the producing author's own
+  runtime for that exact file, read from their `runtime.json` at the credited commit
+  (their measurement on their hardware). `meta.json` names the source per case.
+* **Carried routes, no producer runtime published (12 files: intro case_06-08, 12, 15-18;
+  hard case_01-03, 08):** one run of this entry's router on the instance (30 s, 4 workers,
+  chain-fast, seed 1), warm-started from the shipped file, which returns it unchanged. That
+  run re-produces the route; it did not originate it, and `meta.json` says so per case.
+
+Timed parallel search is nondeterministic, so a repeat can return a different legal route.
+No global-optimality claim is made.
