@@ -1,9 +1,9 @@
 # coordinated_refinement — stress
 
-By [jay-tau](https://github.com/jay-tau). Declared upstream entries: leonid-popryho. Credited authors: Leonid Popryho. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
+By [jay-tau](https://github.com/jay-tau). Declared upstream entries: drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement. Credited authors: Leonid Popryho; Tazeem Mahashin; YJ Kim; kesudh. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Snapshot `2026-10-03T19:16:50.263917+00:00`: 1/1 legal, aggregate 1.098425234622.
+Snapshot `2026-10-14T15:41:01.183766+00:00`: 1/1 legal, aggregate 1.098661344030.
 
-| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+| Case | Previous submitted delay | Best public case | Submitted | Runtime (s) |
 |---|---:|---:|---:|---|
-| case_01 | 1,048,952 | 1,042,322 | 1,042,314 | exact A* and bounded group refinement |
+| case_01 | 1,042,090 | 1,042,090 | 1,042,090 | 34.384 |
