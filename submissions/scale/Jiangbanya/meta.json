@@ -1,0 +1,9 @@
+{
+ "author": "Kevin Wang (KevinChunye)",
+ "url": "https://github.com/KevinChunye/eda-3d-routing-challenge/tree/858a70357904e941fd0069e3ed8f89f446adc395/router",
+ "method": "C++20 PathFinder negotiation (integer, goal-directed bucket-queue searches; exact A* for the initial routing) + exact per-net shortest-path-tree reroute with random equal-delay ties + large-neighbourhood search with negotiated group repair (integer goal-directed searches, exact trees at commit), threshold acceptance from 32 cooling linearly to 0, kicks and return to best, move type chosen by a discounted Thompson-sampling bandit; 4 threads adopting the best every 120 s; one config per tier; from scratch; scale: 300 s per case",
+ "date": "2026-10-18",
+ "hardware": "Intel(R) Xeon(R) Processor @ 2.10GHz (4 vCPU), 16 GB",
+ "threads": 4,
+ "router_commit": "858a70357904e941fd0069e3ed8f89f446adc395"
+}

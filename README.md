@@ -51,14 +51,15 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.1514 | 20/20 | 341746 | 46476.76 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.1509 | 20/20 | 342006 | missing |  | — |
 | 6 | spt_lns | James (IrwinJam) | 1.1444 | 20/20 | 345066 | missing |  | — |
-| 7 | iamparv7043 | Parv (iamparv7043) | 1.1254 | 20/20 | 353836 | 2213.60 | ✓ | — |
-| 8 | anvesh | anvesh | 1.1069 | 20/20 | 360172 | missing |  | — |
-| 9 | synapse-surge | Sameer-Deepak | 1.1004 | 20/20 | 368374 | missing |  | — |
-| 10 | lns_negotiated | adityuhkapoor | 1.0937 | 20/20 | 367388 | missing |  | — |
-| 11 | negotiated_delay | Mantej Singh Gill | 1.0906 | 20/20 | 368046 | 752.29 | ✓ | — |
-| 12 | gavinoh-spt-lns | Gavin Oh | 1.0632 | 20/20 | 382210 | 1826.80 |  | — |
-| 13 | dw_metric_lns | OpenCode (DeepSeek V4.1 Flash) | 1.0584 | 20/20 | 393668 | 25289.93 |  | — |
-| 14 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 | ✓ | — |
+| 7 | Jiangbanya | Kevin Wang (KevinChunye) | 1.1406 | 20/20 | 347104 | 1121.54 | ✓ | — |
+| 8 | iamparv7043 | Parv (iamparv7043) | 1.1254 | 20/20 | 353836 | 2213.60 |  | — |
+| 9 | anvesh | anvesh | 1.1069 | 20/20 | 360172 | missing |  | — |
+| 10 | synapse-surge | Sameer-Deepak | 1.1004 | 20/20 | 368374 | missing |  | — |
+| 11 | lns_negotiated | adityuhkapoor | 1.0937 | 20/20 | 367388 | missing |  | — |
+| 12 | negotiated_delay | Mantej Singh Gill | 1.0906 | 20/20 | 368046 | 752.29 | ✓ | — |
+| 13 | gavinoh-spt-lns | Gavin Oh | 1.0632 | 20/20 | 382210 | 1826.80 |  | — |
+| 14 | dw_metric_lns | OpenCode (DeepSeek V4.1 Flash) | 1.0584 | 20/20 | 393668 | 25289.93 |  | — |
+| 15 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 | ✓ | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement (Leonid Popryho; Taz33m; Tazeem Mahashin; YJ Kim; kesudh); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -72,18 +73,19 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | spt_lns | James (IrwinJam) | 1.3971 | 9/9 | 144153 | missing |  | — |
 | 5 | pathfinder_lns | Tazeem Mahashin | 1.3884 | 9/9 | 144991 | missing |  | — |
 | 6 | warm_lns_refinement † | kesudh | 1.3874 | 9/9 | 145095 | missing |  | — |
-| 7 | reubalink | reubalink | 1.3622 | 9/9 | 147825 | missing |  | — |
-| 8 | iamparv7043 | Parv (iamparv7043) | 1.3019 | 9/9 | 155125 | 7333.40 | ✓ | — |
-| 9 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | missing |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.2569 | 9/9 | 161183 | missing |  | — |
-| 11 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | missing |  | — |
-| 12 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | missing |  | reproduced |
-| 13 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
-| 14 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
-| 15 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
-| 16 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
-| 17 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
-| 18 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
+| 7 | Jiangbanya | Kevin Wang (KevinChunye) | 1.3786 | 9/9 | 146057 | 5391.11 | ✓ | — |
+| 8 | reubalink | reubalink | 1.3622 | 9/9 | 147825 | missing |  | — |
+| 9 | iamparv7043 | Parv (iamparv7043) | 1.3019 | 9/9 | 155125 | 7333.40 |  | — |
+| 10 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | missing |  | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.2569 | 9/9 | 161183 | missing |  | — |
+| 12 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | missing |  | — |
+| 13 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | missing |  | reproduced |
+| 14 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
+| 15 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
+| 16 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
+| 17 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
+| 18 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
+| 19 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on drama3d-portfolio; leonid-popryho (Leonid Popryho; YJ Kim); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -97,11 +99,12 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.1277 | 8/8 | 537468 | 62411.00 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.1274 | 8/8 | 537576 | 7543.00 | ✓ | — |
 | 6 | spt_lns | James (IrwinJam) | 1.1188 | 8/8 | 541966 | missing |  | — |
-| 7 | iamparv7043 | Parv (iamparv7043) | 1.1010 | 8/8 | 550828 | 3094.50 | ✓ | — |
-| 8 | anvesh | anvesh | 1.0821 | 8/8 | 559460 | missing |  | — |
-| 9 | lns_negotiated | adityuhkapoor | 1.0682 | 8/8 | 567094 | missing |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.0496 | 8/8 | 579306 | missing |  | — |
-| 11 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 | ✓ | — |
+| 7 | Jiangbanya | Kevin Wang (KevinChunye) | 1.1152 | 8/8 | 544138 | 2392.88 | ✓ | — |
+| 8 | iamparv7043 | Parv (iamparv7043) | 1.1010 | 8/8 | 550828 | 3094.50 |  | — |
+| 9 | anvesh | anvesh | 1.0821 | 8/8 | 559460 | missing |  | — |
+| 10 | lns_negotiated | adityuhkapoor | 1.0682 | 8/8 | 567094 | missing |  | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.0496 | 8/8 | 579306 | missing |  | — |
+| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 | ✓ | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -114,9 +117,10 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 3 | cuda-have-been-shorter | YJ Kim | 1.0978 | 1/1 | 1042926 | missing |  | — |
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.0914 | 1/1 | 1048990 | 43262.89 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.0911 | 1/1 | 1049332 | 2070.00 | ✓ | — |
-| 6 | spt_lns | James (IrwinJam) | 1.0779 | 1/1 | 1062208 | missing |  | — |
-| 7 | lns_negotiated | adityuhkapoor | 1.0669 | 1/1 | 1073124 | missing |  | — |
-| 8 | synapse-surge | Sameer-Deepak | 1.0008 | 1/1 | 1143964 | missing |  | — |
+| 6 | Jiangbanya | Kevin Wang (KevinChunye) | 1.0798 | 1/1 | 1060258 | 2399.35 |  | — |
+| 7 | spt_lns | James (IrwinJam) | 1.0779 | 1/1 | 1062208 | missing |  | — |
+| 8 | lns_negotiated | adityuhkapoor | 1.0669 | 1/1 | 1073124 | missing |  | — |
+| 9 | synapse-surge | Sameer-Deepak | 1.0008 | 1/1 | 1143964 | missing |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -127,13 +131,14 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 1 | coordinated_refinement † | jay-tau | 1.3508 | 4/4 | 476231 | missing |  | — |
 | 2 | leonid-popryho | Leonid Popryho | 1.3505 | 4/4 | 476333 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.3392 | 4/4 | 479359 | missing |  | — |
-| 4 | spt_lns | James (IrwinJam) | 1.3156 | 4/4 | 489177 | missing |  | — |
-| 5 | pathfinder_lns | Tazeem Mahashin | 1.3111 | 4/4 | 490499 | 61369.30 | ✓ | — |
-| 6 | warm_lns_refinement † | kesudh | 1.3085 | 4/4 | 491467 | 3621.00 | ✓ | — |
-| 7 | iamparv7043 | Parv (iamparv7043) | 1.1252 | 4/4 | 591707 | 4593.60 |  | — |
-| 8 | lns_negotiated | adityuhkapoor | 1.0981 | 4/4 | 590513 | missing |  | — |
-| 9 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0549 | 4/4 | 608243 | 8756.73 |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.0518 | 4/4 | 616017 | missing |  | — |
+| 4 | Jiangbanya | Kevin Wang (KevinChunye) | 1.3189 | 4/4 | 488315 | 28796.49 | ✓ | — |
+| 5 | spt_lns | James (IrwinJam) | 1.3156 | 4/4 | 489177 | missing |  | — |
+| 6 | pathfinder_lns | Tazeem Mahashin | 1.3111 | 4/4 | 490499 | 61369.30 |  | — |
+| 7 | warm_lns_refinement † | kesudh | 1.3085 | 4/4 | 491467 | 3621.00 | ✓ | — |
+| 8 | iamparv7043 | Parv (iamparv7043) | 1.1252 | 4/4 | 591707 | 4593.60 |  | — |
+| 9 | lns_negotiated | adityuhkapoor | 1.0981 | 4/4 | 590513 | missing |  | — |
+| 10 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0549 | 4/4 | 608243 | 8756.73 |  | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.0518 | 4/4 | 616017 | missing |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -147,12 +152,13 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.4354 | 3/3 | 209175 | 47267.61 | ✓ | — |
 | 5 | spt_lns | James (IrwinJam) | 1.4347 | 3/3 | 209415 | missing |  | — |
 | 6 | warm_lns_refinement † | kesudh | 1.4331 | 3/3 | 209509 | 3615.00 | ✓ | — |
-| 7 | iamparv7043 | Parv (iamparv7043) | 1.3276 | 3/3 | 226581 | 1309.30 | ✓ | — |
-| 8 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | missing |  | — |
-| 9 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | missing |  | — |
-| 10 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
-| 11 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
-| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
+| 7 | Jiangbanya | Kevin Wang (KevinChunye) | 1.4331 | 3/3 | 209767 | 10797.13 |  | — |
+| 8 | iamparv7043 | Parv (iamparv7043) | 1.3276 | 3/3 | 226581 | 1309.30 | ✓ | — |
+| 9 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | missing |  | — |
+| 10 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | missing |  | — |
+| 11 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
+| 12 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
+| 13 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
