@@ -1,5 +1,7 @@
 {
  "author": "YJ Kim",
  "method": "GPU-accelerated routing engine",
- "date": "2026-10-06"
+ "date": "2026-10-13",
+ "hardware": "AMD EPYC 7313 16-Core, 1x NVIDIA A40 48 GB, 256 GB RAM",
+ "threads": 16
 }
