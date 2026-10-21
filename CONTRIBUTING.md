@@ -82,15 +82,36 @@ you can only rank higher by submitting better legal routes.
   the router end to end on that case (input to `.sol.json`), not a sum over
   seeds or a single stage. `meta.json` must also say what it ran on:
   `"hardware": "<CPU / GPU, RAM>"` and `"threads": <CPU threads used>`. CI
-  rejects new or updated submissions without these. Entries already on the
-  board that still lack a full `runtime.json` on 2026-10-15 become unranked.
+  rejects new or updated submissions without these, and entries without a full
+  `runtime.json` are unranked.
 * **Derivative entries.** If your routes start from another entry's published
-  routes (a warm start, a refinement, or files carried over unchanged), say so in
-  every tier's `meta.json`:
+  routes (a warm start or a refinement), say so in every tier's `meta.json`:
   `"derived_from": {"submission": "<their entry>", "author": "<their name>"}`.
   The leaderboard marks such entries with `†` and names the upstream entry.
-  Undeclared reuse of another entry's routes may be removed.
+  Derivative entries stay on the board but cannot win a tier. Undeclared reuse
+  of another entry's routes is removed.
+* **Copies.** Every route file must come from your own router's run. A route
+  file identical to another entry's for the same case is a copy and is not
+  accepted, declared in `derived_from` or not: that includes a per-case pick of
+  the best published routes, and a refinement that left a case unchanged
+  (leave that case to the upstream entry, or improve it). CI rejects copies
+  (`scripts/check_copies.py`); cases with fewer than 10 nets are exempt, since
+  independent routers often find the same routes there.
 * **Verified column.** The maintainers mark an entry `reproduced` (in
   `verification.json`, which submission PRs cannot change) once they have re-run
   its router and reproduced its routes. Linking your router's code in `meta.json`
   (`url`) makes that possible.
+
+## Winners
+
+Each tier's winner is the highest-ranked entry that is
+
+1. **independent**: no `derived_from`, and no routes taken from another entry;
+2. **ranked**: legal on every case, with a full `runtime.json`;
+3. **reproduced**: before a tier's winners are named, the maintainers re-run
+   the routers of its top three independent entries and check they reproduce
+   the submitted routes (the `verified` column). An entry whose router code is
+   not available to the maintainers, publicly via `url` in `meta.json` or
+   privately on request, cannot be reproduced and cannot win.
+
+If an entry does not reproduce, the next independent entry moves up.

@@ -38,6 +38,14 @@ jobs:
             if [ -n "$existing" ]; then
               python3 scripts/check_submission_meta.py $existing
             fi
+            # added or changed route files must not copy another entry's
+            sols=""
+            for f in $(echo "$changed" | grep '^submissions/[^/_][^/]*/[^/]*/[^/]*\.sol\.json$' || true); do
+              [ -f "$f" ] && sols="$sols $f"
+            done
+            if [ -n "$sols" ]; then
+              python3 scripts/check_copies.py $sols
+            fi
             # README.md: only the generated leaderboard block may change
             if echo "$changed" | grep -qx 'README.md'; then
               strip() { sed '/^<!-- leaderboard:start/,/^<!-- leaderboard:end -->/d'; }
