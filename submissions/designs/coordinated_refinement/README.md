@@ -1,11 +1,11 @@
 # coordinated_refinement — designs
 
-By [jay-tau](https://github.com/jay-tau). Declared upstream entries: leonid-popryho. Credited authors: Leonid Popryho. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
+By [jay-tau](https://github.com/jay-tau). Declared upstream entries: drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement. Credited authors: Leonid Popryho; Tazeem Mahashin; YJ Kim; kesudh. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Snapshot `2026-10-03T19:16:50.263917+00:00`: 3/3 legal, aggregate 1.467311092763.
+Snapshot `2026-10-16T06:35:48.015527+00:00`: 3/3 legal, aggregate 1.478328678981.
 
-| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+| Case | Previous submitted delay | Best public case | Submitted | Runtime (s) |
 |---|---:|---:|---:|---|
-| ctrl | 49,928 | 48,948 | 48,930 | exact A* and bounded group refinement |
-| int2float | 90,372 | 88,112 | 88,064 | exact A* and bounded group refinement |
-| router | 68,765 | 67,521 | 67,503 | exact A* and bounded group refinement |
+| ctrl | 48,654 | 48,652 | 48,652 | 31.031 |
+| int2float | 87,334 | 87,334 | 87,334 | 31.347 |
+| router | 66,937 | 66,937 | 66,937 | 31.338 |

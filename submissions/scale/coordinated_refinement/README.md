@@ -1,16 +1,16 @@
 # coordinated_refinement — scale
 
-By [jay-tau](https://github.com/jay-tau). Declared upstream entries: leonid-popryho. Credited authors: Leonid Popryho. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
+By [jay-tau](https://github.com/jay-tau). Declared upstream entries: cuda-have-been-shorter; drama3d-portfolio; leonid-popryho; pathfinder_lns; pathfinder_refinement; spt_lns; warm_lns_refinement. Credited authors: James (IrwinJam); Leonid Popryho; Tazeem Mahashin; YJ Kim; kesudh. Exact contributing sources are in `meta.json`. See the [shared method and attribution](../../hard/coordinated_refinement/README.md).
 
-Snapshot `2026-10-03T19:16:50.263917+00:00`: 8/8 legal, aggregate 1.139865842539.
+Snapshot `2026-10-16T06:35:48.015527+00:00`: 8/8 legal, aggregate 1.140427447614.
 
-| Case | Previous PR24 delay | Best public case | Submitted | Selected method |
+| Case | Previous submitted delay | Best public case | Submitted | Runtime (s) |
 |---|---:|---:|---:|---|
-| case_01 | 39,262 | 38,988 | 38,986 | exact A* and bounded group refinement |
-| case_02 | 45,378 | 44,768 | 44,760 | exact A* and bounded group refinement |
-| case_03 | 56,414 | 55,986 | 55,980 | exact A* and bounded group refinement |
-| case_04 | 57,056 | 56,234 | 56,212 | exact A* and bounded group refinement |
-| case_05 | 66,181 | 65,475 | 65,475 | retained public route |
-| case_06 | 78,079 | 77,419 | 77,413 | exact A* and bounded group refinement |
-| case_07 | 86,395 | 85,859 | 85,841 | exact A* and bounded group refinement |
-| case_08 | 108,499 | 107,037 | 107,021 | exact A* and bounded group refinement |
+| case_01 | 38,982 | 38,982 | 38,982 | 30.433 |
+| case_02 | 44,718 | 44,718 | 44,718 | 30.366 |
+| case_03 | 55,922 | 55,922 | 55,922 | 30.389 |
+| case_04 | 56,210 | 56,210 | 56,208 | 31.381 |
+| case_05 | 65,455 | 65,455 | 65,455 | 31.010 |
+| case_06 | 77,383 | 77,375 | 77,375 | 30.972 |
+| case_07 | 85,823 | 85,823 | 85,823 | 30.913 |
+| case_08 | 106,937 | 106,937 | 106,937 | 35.860 |
