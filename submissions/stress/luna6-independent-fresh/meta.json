@@ -1,0 +1,8 @@
+{
+  "author": "James (IrwinJam)",
+  "date": "2026-10-22",
+  "hardware": "Mixed by case: retained routes from AMD Ryzen 7 8845HS and improved routes from AMD Ryzen 9 3950X 16-Core Processor (16 physical cores, 32 logical threads), Linux 7.0.0-34-generic, 67314638848 bytes RAM, CPU-only; see provenance.json.",
+  "method": "Source-aware shortest-path-tree routing, negotiated congestion, exact per-net refinement, and bounded large-neighborhood search. Improved routes come from independent raw-input seeds with 600- or 1,200-second search budgets; only lower-delay legal routes unique among sibling submissions are retained.",
+  "threads": 1,
+  "url": "https://github.com/IrwinJam/m3d-router/tree/81e4729b7c17c40987a8f57436fa94b9cb1ece96"
+}
