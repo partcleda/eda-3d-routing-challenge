@@ -1,0 +1,6 @@
+{
+  "author": "Sharavana Kumar",
+  "description": "Root-Aware SPT + A* Fanout-Weighted Negotiated Congestion + LNS in C++17",
+  "hardware": "x86_64",
+  "threads": 1
+}

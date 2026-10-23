@@ -27,9 +27,10 @@ do not edit it by hand.
 | 9 | synapse-surge | Sameer-Deepak | 1.1004 | 20/20 | 368374 | missing |  | — |
 | 10 | lns_negotiated | adityuhkapoor | 1.0937 | 20/20 | 367388 | missing |  | — |
 | 11 | negotiated_delay | Mantej Singh Gill | 1.0906 | 20/20 | 368046 | 752.29 | ✓ | — |
-| 12 | gavinoh-spt-lns | Gavin Oh | 1.0632 | 20/20 | 382210 | 1826.80 |  | — |
-| 13 | dw_metric_lns | OpenCode (DeepSeek V4.1 Flash) | 1.0584 | 20/20 | 393668 | 25289.93 |  | — |
-| 14 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 | ✓ | — |
+| 12 | sharavana864 | Sharavana Kumar | 1.0771 | 20/20 | 372628 | 89.20 | ✓ | — |
+| 13 | gavinoh-spt-lns | Gavin Oh | 1.0632 | 20/20 | 382210 | 1826.80 |  | — |
+| 14 | dw_metric_lns | OpenCode (DeepSeek V4.1 Flash) | 1.0584 | 20/20 | 393668 | 25289.93 |  | — |
+| 15 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0274 | 20/20 | 388638 | 440.56 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on drama3d-portfolio; leonid-popryho; pathfinder_lns; warm_lns_refinement (Leonid Popryho; Taz33m; Tazeem Mahashin; YJ Kim; kesudh); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -49,12 +50,13 @@ do not edit it by hand.
 | 10 | synapse-surge | Sameer-Deepak | 1.2569 | 9/9 | 161183 | missing |  | — |
 | 11 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | missing |  | — |
 | 12 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | missing |  | reproduced |
-| 13 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
-| 14 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
-| 15 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
-| 16 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
-| 17 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
-| 18 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
+| 13 | sharavana864 | Sharavana Kumar | 1.1738 | 9/9 | 171791 | 10.05 | ✓ | — |
+| 14 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 |  | — |
+| 15 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 |  | — |
+| 16 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
+| 17 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
+| 18 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 |  | — |
+| 19 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on drama3d-portfolio; leonid-popryho (Leonid Popryho; YJ Kim); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -71,8 +73,9 @@ do not edit it by hand.
 | 7 | iamparv7043 | Parv (iamparv7043) | 1.1010 | 8/8 | 550828 | 3094.50 | ✓ | — |
 | 8 | anvesh | anvesh | 1.0821 | 8/8 | 559460 | missing |  | — |
 | 9 | lns_negotiated | adityuhkapoor | 1.0682 | 8/8 | 567094 | missing |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.0496 | 8/8 | 579306 | missing |  | — |
-| 11 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 | ✓ | — |
+| 10 | sharavana864 | Sharavana Kumar | 1.0523 | 8/8 | 575260 | 284.87 | ✓ | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.0496 | 8/8 | 579306 | missing |  | — |
+| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0108 | 8/8 | 598244 | 2196.48 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -102,9 +105,10 @@ do not edit it by hand.
 | 5 | pathfinder_lns | Tazeem Mahashin | 1.3111 | 4/4 | 490499 | 61369.30 | ✓ | — |
 | 6 | warm_lns_refinement † | kesudh | 1.3085 | 4/4 | 491467 | 3621.00 | ✓ | — |
 | 7 | iamparv7043 | Parv (iamparv7043) | 1.1252 | 4/4 | 591707 | 4593.60 |  | — |
-| 8 | lns_negotiated | adityuhkapoor | 1.0981 | 4/4 | 590513 | missing |  | — |
-| 9 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0549 | 4/4 | 608243 | 8756.73 |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.0518 | 4/4 | 616017 | missing |  | — |
+| 8 | sharavana864 | Sharavana Kumar | 1.1155 | 4/4 | 575621 | 135.38 | ✓ | — |
+| 9 | lns_negotiated | adityuhkapoor | 1.0981 | 4/4 | 590513 | missing |  | — |
+| 10 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0549 | 4/4 | 608243 | 8756.73 |  | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.0518 | 4/4 | 616017 | missing |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -121,9 +125,10 @@ do not edit it by hand.
 | 7 | iamparv7043 | Parv (iamparv7043) | 1.3276 | 3/3 | 226581 | 1309.30 | ✓ | — |
 | 8 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | missing |  | — |
 | 9 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | missing |  | — |
-| 10 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
-| 11 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
-| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
+| 10 | sharavana864 | Sharavana Kumar | 1.2404 | 3/3 | 242473 | 114.49 | ✓ | — |
+| 11 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 |  | — |
+| 12 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
+| 13 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
