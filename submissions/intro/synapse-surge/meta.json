@@ -1,5 +1,5 @@
 {
  "author": "Sameer-Deepak",
- "method": "Negotiated-congestion router with shortest-path-tree sink attachment (alpha-blended seeding) and A* search, multi-start over net order/alpha/schedule, single-net delay recovery, then group rip-up-and-renegotiate local search on the legal solution",
- "date": "2026-10-03"
+ "method": "C-core negotiated-congestion router (PathFinder, slow fanout-weighted schedule) with shortest-path-tree sink attachment and exact-bound A*, exact per-net SPT reroute, then large-neighbourhood search (windowed group re-negotiation and exact sequential group moves) over multiple independent fresh starts. Not derived from other entries' routes.",
+ "date": "2026-10-11"
 }
