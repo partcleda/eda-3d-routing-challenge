@@ -1,0 +1,11 @@
+{
+  "format": "cold-spt-source-v1",
+  "version": "8a482057519a057395a09aafe2f8421696312f217b493db1ec412e212300ce91",
+  "files": {
+    "run.py": "4d7115e01c64f07fd87aa536feb425b576b250cb533f6d831ec87deda1c8e31f",
+    "router/Cargo.toml": "0a5f5535cb03de16534692e765aaccda17bf2014ae858572e8648cd82b070ce2",
+    "router/Cargo.lock": "c493aac7c1aefe0ae221238493c4db75957232de2e3cf8073fa8275edbbf8402",
+    "router/src/main.rs": "c0f15e546715b07a3c4db1b80752ac18b3edb72c4f9a29a61f2d5ee4bf84a2f1"
+  },
+  "original_commit": "691ea56c6dc77e0e7130e496d1f1101b0eaba52e"
+}

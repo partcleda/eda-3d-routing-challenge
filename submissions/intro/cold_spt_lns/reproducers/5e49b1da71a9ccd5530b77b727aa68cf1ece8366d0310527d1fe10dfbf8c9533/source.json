@@ -1,0 +1,14 @@
+{
+  "format": "cold-spt-source-v1",
+  "version": "5e49b1da71a9ccd5530b77b727aa68cf1ece8366d0310527d1fe10dfbf8c9533",
+  "files": {
+    "run.py": "65503bcc9f3baeed22b3f7410c92adc0380f8e38540056778ab7310492194e4c",
+    "router/Cargo.toml": "0a5f5535cb03de16534692e765aaccda17bf2014ae858572e8648cd82b070ce2",
+    "router/Cargo.lock": "c493aac7c1aefe0ae221238493c4db75957232de2e3cf8073fa8275edbbf8402",
+    "router/src/compact.rs": "9b134be8f648cbee2bb2a8e9ecbcfe66bf60041082b5695a4dba2b5b85d9844f",
+    "router/src/cost_distance.rs": "1b7d8f83bfe9060c8ed4b8306550191c9adfc1322613f08e984cd8067429fe5a",
+    "router/src/joint.rs": "b2dbbd738fb3f075ca7ac0896c07c01b77c4ed912668054f3579bc5880444454",
+    "router/src/main.rs": "a199681e287eaeed9d4fe2a26fc862ada165f7521c073e1785bbcbade032be5d",
+    "router/src/refine.rs": "6fd9515493b38cff653bd657fb5cab5c2fc21d04117d5c7fe1847a49889d3008"
+  }
+}
