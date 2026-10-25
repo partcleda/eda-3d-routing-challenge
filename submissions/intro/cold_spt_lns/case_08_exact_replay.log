@@ -1,0 +1,7 @@
+ROOT exact replay normalization stage 1. No checker was run.
+Proof SHA-256: 46065b39500a09c06fd8df697d1d2f438d8910ecd7ad1a66ec6ba3b6f27036a2
+Replay request SHA-256: ceb8958e575454c507b3b0f64bedde12fe608c1cc13c1d65e7aeb540d015acea
+Replay guard SHA-256: 09e1cbbc8e230b5bc90167a36706ca85c092751412459f322602184917ed2d5b
+Replay event-log SHA-256: c468288ae9471c94d0da7398cda10a1db6d8ee68cfc66159e3d001ad619b82dc
+Original producing runtime: 657.35999999998603s; separate replay runtime: 703.73400000005495s.
+Output SHA-256: ab3fa541e42b4382b231ffd376793cf577a41ada1840b7b870564d09cf678bbd; checked delay: 7519.

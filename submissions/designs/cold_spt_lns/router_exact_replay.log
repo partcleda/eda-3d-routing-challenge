@@ -1,0 +1,7 @@
+DERIVED ROOT VERIFICATION SUMMARY. This is not native stdout, stderr, or the raw guard event log.
+Original ROOT exact-replay proof SHA-256: 98b8b8a87d07fa31a1ce8c242cb3f995f9c44723e5096a183779fa1064e3cb9a
+Raw replay guard-event log SHA-256: 8de9c2550590c9c0b983d539166d715a74e0eb1c96bbcf32aa4ff1b66e915945
+Replay request SHA-256: 31ed1090e8133dc1998cab105d95e5c48df8817de591962138de6794353a9fd9
+Original producer runtime retained: 25239.515000000014 seconds.
+Separate exact replay runtime: 17593.359000000055 seconds.
+REPLAY designs/router: byte-identical, delay=70329, output_sha256=a3bc9bca40880af74cb18d5b451437df49c838ccd1f506f3ef25a00c25662b49, source=44df9af614ff09212931d4168a42a64e0bf49657fe7b87155c6fb6dc0e71f696

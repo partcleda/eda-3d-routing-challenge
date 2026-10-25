@@ -1,0 +1,8 @@
+ROOT-derived CBS exact replay normalization for hard/case_04
+Original producing time: 463.545999999973 s (from closed guard).
+Separate exact replay time: 435.327999999980 s (never substituted).
+Delay: 13355; public predecessor delay: 13359; gain: 4.
+Output SHA-256: 776c4ace39e1f825fc37071835d7faf372e9255f6c2f448f9e89959fa4474513
+Exact proof SHA-256: 3c3bc911f12ac836626f0d6befdec2aec4a86a28adff9055b2589f5b3a066658
+Originality receipt SHA-256: 46a7f039e32db33459f32c310750541a9795e98e57cb67c15786cbb44d47b5d7
+No new quality search was performed.

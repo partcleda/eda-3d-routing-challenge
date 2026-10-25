@@ -1,0 +1,15 @@
+{
+  "format": "cold-spt-source-v1",
+  "version": "f6532d33dcd611182daf06c34f888c341b38713fc0a007ff956a00d1f2d452be",
+  "files": {
+    "run.py": "203c6b3a8088bfb825f5e8565b6a94811c20d8411aa329b0800e01ce684fd084",
+    "router/Cargo.toml": "0a5f5535cb03de16534692e765aaccda17bf2014ae858572e8648cd82b070ce2",
+    "router/Cargo.lock": "c493aac7c1aefe0ae221238493c4db75957232de2e3cf8073fa8275edbbf8402",
+    "router/src/compact.rs": "9b134be8f648cbee2bb2a8e9ecbcfe66bf60041082b5695a4dba2b5b85d9844f",
+    "router/src/cost_distance.rs": "279dd66cb4f252c25648701a13397511cda38ed6050bbee1b5f3f7040fbe356e",
+    "router/src/joint.rs": "e1fac3108730739a8fe53ee2405c111d7e035d2c01d798384bc26aae816f07c5",
+    "router/src/main.rs": "de90284bc45c0fb22e57df60175a16c2c45266d476bfe4e71476c764c7211f29",
+    "router/src/refine.rs": "baf726e5d3cd432ef00cbd043f5275d425aebfbc616dd07d63bf06f3ae4862f1",
+    "router/src/route_pool.rs": "c4816c13c0d1d27d0aa3b456e405d3f2fccd454e534344ebb96fdcf4bbc1a8c5"
+  }
+}

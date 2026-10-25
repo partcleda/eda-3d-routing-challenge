@@ -1,0 +1,20 @@
+{
+  "format": "source029-owner-set-local-shortcut-archive-v1",
+  "source_version": "1e314104a237b9f78c07a4044e9969c63b9f3c2d8315ea13c3b82a54cfa306d8",
+  "file_count": 13,
+  "files": {
+    "run.py": "18af8f892e0bf9040e3f438429854d9db461af5445eec7d9461c6f92f0627993",
+    "router/Cargo.toml": "0a5f5535cb03de16534692e765aaccda17bf2014ae858572e8648cd82b070ce2",
+    "router/Cargo.lock": "c493aac7c1aefe0ae221238493c4db75957232de2e3cf8073fa8275edbbf8402",
+    "router/src/adaptive.rs": "6d3f6bb26ce78c97cf4560f64ab878dae7a275f0e93f239f622bedbaa6990537",
+    "router/src/closure_select.rs": "06bbe3419f08184605338a0fc4440bda0f4b66cec4bc9f3a3cc568be816e2200",
+    "router/src/compact.rs": "9b134be8f648cbee2bb2a8e9ecbcfe66bf60041082b5695a4dba2b5b85d9844f",
+    "router/src/cost_distance.rs": "279dd66cb4f252c25648701a13397511cda38ed6050bbee1b5f3f7040fbe356e",
+    "router/src/joint.rs": "e1fac3108730739a8fe53ee2405c111d7e035d2c01d798384bc26aae816f07c5",
+    "router/src/main.rs": "95364038ea2ce43c9b57f0dfce693774c7d9465ddcefbb63d4a7ffa94be35581",
+    "router/src/recursive_yield.rs": "7bf30f4797a25d2e89b4241e02859605783a4b3301a4888604f9496eb15cb2b1",
+    "router/src/refine.rs": "9cc63ebee5527c7d63c5a43da2207cbedadbac0451ab7c85acfbc6e2370276e0",
+    "router/src/route_pool.rs": "c4816c13c0d1d27d0aa3b456e405d3f2fccd454e534344ebb96fdcf4bbc1a8c5",
+    "router/src/subset_tree.rs": "60877e47e94a794008c9a5a9295dd0428e5e9eb9aecd864c6f7988e6dc64c550"
+  }
+}

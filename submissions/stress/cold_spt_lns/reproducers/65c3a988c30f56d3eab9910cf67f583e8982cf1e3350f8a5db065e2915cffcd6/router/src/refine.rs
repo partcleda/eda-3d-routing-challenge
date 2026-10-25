@@ -1,0 +1,5759 @@
+// Refinement code from our own earlier Rust engine, adapted for fixed-work cold runs.
+// Route geometry is supplied only by the cold constructor in this process.
+// m3d-lns: warm-start LNS engine for the M3D routing challenge.
+//
+// Loads an instance + an incumbent legal solution, then runs randomized
+// group rip-up / exact-SPT reroute moves (with equal-delay tie jitter),
+// accepting non-worsening moves and tracking the best. The objective and
+// legality rules implemented here mirror m3d/checker.py exactly; every
+// improvement is intended to be re-verified by the repo checker.
+use serde_json::Value;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+#[path = "compact.rs"]
+mod compact_tree;
+#[path = "route_pool.rs"]
+mod route_pool;
+pub use route_pool::write_pool;
+#[path = "joint.rs"]
+mod joint;
+mod cbs {
+    //! Static vertex-disjoint, multi-sink adaptation of conflict-based search.
+    //! Each low-level SPT exactly minimizes the sum of driver-to-sink delays.
+    //! A shared vertex requires at least one of its two nets to avoid it, so
+    //! branching on those two exclusions covers every feasible resolution.
+    //! Cost is an admissible bound; a bounded run makes no global-optimality claim.
+    use super::*;
+
+    #[derive(Clone)]
+    struct Route {
+        verts: Vec<u32>,
+        edges: Vec<(u32, u32)>,
+        delay: u64,
+    }
+    struct Node {
+        routes: Vec<Arc<Route>>,
+        bans: Vec<Vec<u32>>,
+        cost: u64,
+    }
+
+    fn low_level(
+        inst: &Inst,
+        owner: &mut [i32],
+        ws: &mut Scratch,
+        nid: usize,
+        bans: &[u32],
+        cap: u64,
+    ) -> Option<Arc<Route>> {
+        // Dijkstra initializes the source even when occupied; disallow own pins
+        // explicitly so source constraints are honored as well as sink constraints.
+        if bans
+            .iter()
+            .any(|&v| inst.pin_owner[v as usize] == nid as i32)
+        {
+            return None;
+        }
+        let saved: Vec<_> = bans.iter().map(|&v| (v, owner[v as usize])).collect();
+        for &v in bans {
+            owner[v as usize] = i32::MAX;
+        }
+        ws.dijkstra(
+            inst,
+            owner,
+            inst.nets[nid].driver,
+            nid as i32,
+            false,
+            cap.min(u32::MAX as u64) as u32,
+        );
+        let route = ws.extract(inst, &inst.nets[nid]);
+        for (v, o) in saved {
+            owner[v as usize] = o;
+        }
+        route.and_then(|(verts, edges, delay)| {
+            if delay <= cap {
+                Some(Arc::new(Route {
+                    verts,
+                    edges,
+                    delay,
+                }))
+            } else {
+                None
+            }
+        })
+    }
+
+    fn conflicts(routes: &[Arc<Route>]) -> (usize, Option<(usize, usize, u32)>) {
+        let mut count = 0;
+        let mut selected = None;
+        let mut most = 0;
+        for i in 0..routes.len() {
+            for j in i + 1..routes.len() {
+                let a = &routes[i].verts;
+                let b = &routes[j].verts;
+                let (mut x, mut y) = (0, 0);
+                let mut common = Vec::new();
+                while x < a.len() && y < b.len() {
+                    if a[x] == b[y] {
+                        common.push(a[x]);
+                        x += 1;
+                        y += 1;
+                    } else if a[x] < b[y] {
+                        x += 1;
+                    } else {
+                        y += 1;
+                    }
+                }
+                count += common.len();
+                if common.len() > most {
+                    most = common.len();
+                    selected = Some((i, j, common[common.len() / 2]));
+                }
+            }
+        }
+        (count, selected)
+    }
+
+    // Probe at most four shared vertices in the most-overlapping route pair.
+    // Prefer an exclusion that raises both exact per-net bounds, then either
+    // bound. These static multi-sink SPT probes adapt ICBS conflict priority;
+    // they do not enumerate every conflict or change the two exclusion branches.
+    fn choose_conflict(
+        inst: &Inst,
+        owner: &mut [i32],
+        ws: &mut Scratch,
+        group: &[usize],
+        node: &Node,
+        cap: u64,
+        deadline: Instant,
+    ) -> Option<(usize, usize, u32)> {
+        let (a, b, original) = conflicts(&node.routes).1?;
+        let other: std::collections::HashSet<u32> = node.routes[b].verts.iter().copied().collect();
+        let common: Vec<u32> = node.routes[a]
+            .verts
+            .iter()
+            .copied()
+            .filter(|v| other.contains(v))
+            .collect();
+        let mut candidates = vec![original];
+        for i in [0, common.len() / 4, common.len() - 1] {
+            if !candidates.contains(&common[i]) {
+                candidates.push(common[i]);
+            }
+        }
+        let (mut best, mut best_rank) = (original, 0);
+        for v in candidates {
+            if Instant::now() >= deadline {
+                break;
+            }
+            let mut rank = 0;
+            for gi in [a, b] {
+                let mut bans = node.bans[gi].clone();
+                match bans.binary_search(&v) {
+                    Ok(_) => unreachable!("constrained vertex in route"),
+                    Err(i) => bans.insert(i, v),
+                }
+                let others = node.cost - node.routes[gi].delay;
+                ws.cbs_priority_probes += 1;
+                let constrained = low_level(inst, owner, ws, group[gi], &bans, cap - others);
+                if constrained
+                    .as_ref()
+                    .map_or(true, |r| r.delay > node.routes[gi].delay)
+                {
+                    rank += 1;
+                }
+            }
+            if rank > best_rank {
+                best_rank = rank;
+                best = v;
+            }
+            if rank == 2 {
+                break;
+            }
+        }
+        Some((a, b, best))
+    }
+
+    // cap is inclusive. None includes both exhausted/infeasible and budget-limited
+    // search; callers deliberately make no infeasibility claim from that value.
+    fn search(
+        inst: &Inst,
+        owner: &mut [i32],
+        ws: &mut Scratch,
+        group: &[usize],
+        cap: u64,
+        max_nodes: usize,
+        deadline: Instant,
+    ) -> Option<Vec<Arc<Route>>> {
+        let mut routes = Vec::new();
+        let mut cost = 0;
+        for &nid in group {
+            if Instant::now() >= deadline {
+                return None;
+            }
+            let route = low_level(inst, owner, ws, nid, &[], cap)?;
+            cost += route.delay;
+            if cost > cap {
+                return None;
+            }
+            routes.push(route);
+        }
+        let (nconflict, _) = conflicts(&routes);
+        let mut nodes = vec![Some(Node {
+            routes,
+            bans: vec![Vec::new(); group.len()],
+            cost,
+        })];
+        let mut queue = BinaryHeap::from([Reverse((cost, nconflict, 0usize))]);
+        let mut seen = std::collections::HashSet::<Vec<(usize, u32)>>::new();
+        seen.insert(Vec::new());
+        let mut expanded = 0;
+        while let Some(Reverse((_, _, id))) = queue.pop() {
+            if expanded >= max_nodes || Instant::now() >= deadline {
+                break;
+            }
+            expanded += 1;
+            let node = nodes[id].take().unwrap();
+            let conflict = if ws.cbs_conflict_priority {
+                choose_conflict(inst, owner, ws, group, &node, cap, deadline)
+            } else {
+                conflicts(&node.routes).1
+            };
+            let Some((a, b, v)) = conflict else {
+                return Some(node.routes);
+            };
+            for gi in [a, b] {
+                let mut bans = node.bans.clone();
+                match bans[gi].binary_search(&v) {
+                    Ok(_) => unreachable!("constrained vertex in route"),
+                    Err(p) => bans[gi].insert(p, v),
+                }
+                let key: Vec<_> = bans
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, vs)| vs.iter().map(move |&v| (i, v)))
+                    .collect();
+                if !seen.insert(key) {
+                    continue;
+                }
+                let others = node.cost - node.routes[gi].delay;
+                let Some(route) = low_level(inst, owner, ws, group[gi], &bans[gi], cap - others)
+                else {
+                    continue;
+                };
+                let cost = others + route.delay;
+                assert!(cost >= node.cost);
+                let mut routes = node.routes.clone();
+                routes[gi] = route;
+                let (nconflict, _) = conflicts(&routes);
+                let id = nodes.len();
+                nodes.push(Some(Node { routes, bans, cost }));
+                queue.push(Reverse((cost, nconflict, id)));
+            }
+        }
+        None
+    }
+
+    // ICBS helpful bypass adapted to static multi-sink vertex resources.
+    // Same cost, fewer conflicts, and unchanged PARENT constraints are required.
+    // Node limits still bound work; exhaustion is not an infeasibility proof.
+    fn search_bypass(
+        inst: &Inst,
+        owner: &mut [i32],
+        ws: &mut Scratch,
+        group: &[usize],
+        cap: u64,
+        max_nodes: usize,
+        deadline: Instant,
+        bypasses: &mut usize,
+    ) -> Option<Vec<Arc<Route>>> {
+        let mut routes = Vec::new();
+        let mut cost = 0;
+        for &nid in group {
+            if Instant::now() >= deadline {
+                return None;
+            }
+            let route = low_level(inst, owner, ws, nid, &[], cap)?;
+            cost += route.delay;
+            if cost > cap {
+                return None;
+            }
+            routes.push(route);
+        }
+        let (nconflict, _) = conflicts(&routes);
+        let mut nodes = vec![Some(Node {
+            routes,
+            bans: vec![Vec::new(); group.len()],
+            cost,
+        })];
+        let mut queue = BinaryHeap::from([Reverse((cost, nconflict, 0usize))]);
+        let mut seen = std::collections::HashSet::<Vec<(usize, u32)>>::new();
+        seen.insert(Vec::new());
+        let mut expanded = 0;
+        while let Some(Reverse((_, _, id))) = queue.pop() {
+            if expanded >= max_nodes || Instant::now() >= deadline {
+                break;
+            }
+            expanded += 1;
+            let node = nodes[id].take().unwrap();
+            let (parent_conflicts, ordinary_conflict) = conflicts(&node.routes);
+            let conflict = if ws.cbs_conflict_priority {
+                choose_conflict(inst, owner, ws, group, &node, cap, deadline)
+            } else {
+                ordinary_conflict
+            };
+            let Some((a, b, v)) = conflict else {
+                return Some(node.routes);
+            };
+            let mut children = Vec::new();
+            let mut adopted_bypass = false;
+            for gi in [a, b] {
+                let mut bans = node.bans.clone();
+                match bans[gi].binary_search(&v) {
+                    Ok(_) => unreachable!("constrained vertex in route"),
+                    Err(p) => bans[gi].insert(p, v),
+                }
+                let key: Vec<_> = bans
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, vs)| vs.iter().map(move |&v| (i, v)))
+                    .collect();
+                if seen.contains(&key) {
+                    continue;
+                }
+                let others = node.cost - node.routes[gi].delay;
+                let Some(route) = low_level(inst, owner, ws, group[gi], &bans[gi], cap - others)
+                else {
+                    seen.insert(key);
+                    continue;
+                };
+                let cost = others + route.delay;
+                assert!(cost >= node.cost);
+                let mut routes = node.routes.clone();
+                routes[gi] = route;
+                let (nconflict, _) = conflicts(&routes);
+                if cost == node.cost && nconflict < parent_conflicts {
+                    // Adopt the equal-cost representative under the PARENT'S
+                    // constraints. The added child ban is deliberately discarded.
+                    // Its key must NOT be marked seen unless actually enqueued.
+                    let next = nodes.len();
+                    nodes.push(Some(Node {
+                        routes,
+                        bans: node.bans.clone(),
+                        cost,
+                    }));
+                    queue.push(Reverse((cost, nconflict, next)));
+                    *bypasses += 1;
+                    adopted_bypass = true;
+                    break;
+                }
+                children.push((key, Node { routes, bans, cost }, nconflict));
+            }
+            if !adopted_bypass {
+                for (key, child, nconflict) in children {
+                    if !seen.insert(key) {
+                        continue;
+                    }
+                    let next = nodes.len();
+                    let cost = child.cost;
+                    nodes.push(Some(child));
+                    queue.push(Reverse((cost, nconflict, next)));
+                }
+            }
+        }
+        None
+    }
+
+    pub(super) fn group_move(
+        inst: &Inst,
+        sol: &mut Solution,
+        owner: &mut [i32],
+        ws: &mut Scratch,
+        group: &[usize],
+        max_nodes: usize,
+        bypass: bool,
+        deadline: Instant,
+    ) -> Option<(i64, bool)> {
+        if group.len() < 2 {
+            return None;
+        }
+        let old: u64 = group.iter().map(|&n| sol.delay[n]).sum();
+        if old == 0 {
+            return None;
+        }
+        for &n in group {
+            uncommit(owner, &sol.verts[n]);
+        }
+        let mut bypasses = 0;
+        let result = if bypass {
+            search_bypass(
+                inst,
+                owner,
+                ws,
+                group,
+                old - 1,
+                max_nodes,
+                deadline,
+                &mut bypasses,
+            )
+        } else {
+            search(inst, owner, ws, group, old - 1, max_nodes, deadline)
+        };
+        ws.cbs_bypasses += bypasses as u64;
+        let Some(routes) = result else {
+            for &n in group {
+                commit(owner, n, &sol.verts[n]);
+            }
+            return None;
+        };
+        let new: u64 = routes.iter().map(|r| r.delay).sum();
+        assert!(new < old);
+        let old_v: usize = group.iter().map(|&n| sol.verts[n].len()).sum();
+        let new_v: usize = routes.iter().map(|r| r.verts.len()).sum();
+        for (&n, r) in group.iter().zip(routes) {
+            assert!(r.verts.iter().all(|&v| owner[v as usize] < 0));
+            commit(owner, n, &r.verts);
+            sol.verts[n] = r.verts.clone();
+            sol.edges[n] = r.edges.clone();
+            sol.delay[n] = r.delay;
+        }
+        sol.total = sol.total - old + new;
+        sol.vcount = (sol.vcount as usize - old_v + new_v) as u64;
+        Some((new as i64 - old as i64, true))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        // Independent brute-force enumeration of every tree edge subset on 3x3.
+        // Includes branching two-sink nets, infeasible instances, and cost caps.
+        fn enumerate(inst: &Inst, nid: usize) -> Vec<Route> {
+            let mut all = Vec::new();
+            let mut nb = [0; 6];
+            let mut wb = [0; 6];
+            for v in 0..inst.n {
+                let k = inst.neigh(v, &mut nb, &mut wb);
+                for &u in &nb[..k] {
+                    if v < u {
+                        all.push((v, u));
+                    }
+                }
+            }
+            let mut out = Vec::new();
+            for mask in 1u64..1u64 << all.len() {
+                let edges: Vec<_> = all
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &e)| if mask >> i & 1 == 1 { Some(e) } else { None })
+                    .collect();
+                let mut verts: Vec<_> = edges.iter().flat_map(|&(a, b)| [a, b]).collect();
+                verts.sort_unstable();
+                verts.dedup();
+                if edges.len() + 1 != verts.len()
+                    || verts.iter().any(|&v| {
+                        inst.pin_owner[v as usize] >= 0 && inst.pin_owner[v as usize] != nid as i32
+                    })
+                {
+                    continue;
+                }
+                let net = &inst.nets[nid];
+                if !verts.contains(&net.driver) || net.sinks.iter().any(|s| !verts.contains(s)) {
+                    continue;
+                }
+                let mut d = vec![u64::MAX; inst.n as usize];
+                d[net.driver as usize] = 0;
+                for _ in 0..inst.n {
+                    for &(a, b) in &edges {
+                        let w = edge_w(inst, a, b).unwrap() as u64;
+                        d[b as usize] = d[b as usize].min(d[a as usize].saturating_add(w));
+                        d[a as usize] = d[a as usize].min(d[b as usize].saturating_add(w));
+                    }
+                }
+                if verts.iter().any(|&v| d[v as usize] == u64::MAX) {
+                    continue;
+                }
+                let delay = net.sinks.iter().map(|&s| d[s as usize]).sum();
+                out.push(Route {
+                    verts,
+                    edges,
+                    delay,
+                });
+            }
+            out
+        }
+        #[test]
+        fn cbs_larger_groups_match_independent_path_oracle() {
+            compare_larger_groups_with_path_oracle(false, false);
+        }
+        #[test]
+        fn cbs_bypass_matches_independent_path_oracle() {
+            assert!(compare_larger_groups_with_path_oracle(true, false) > 0);
+        }
+        #[test]
+        fn cbs_conflict_priority_matches_independent_path_oracle() {
+            compare_larger_groups_with_path_oracle(false, true);
+            compare_larger_groups_with_path_oracle(true, true);
+        }
+        fn compare_larger_groups_with_path_oracle(bypass: bool, priority: bool) -> usize {
+            // On this positive-cost single-sink grid an optimum tree is a path.
+            // Enumerate every simple path independently of Scratch/Dijkstra,
+            // then enumerate disjoint path combinations for two through eight nets.
+            fn paths(inst: &Inst, owner: &[i32], nid: usize) -> Vec<(u32, u64)> {
+                fn visit(
+                    inst: &Inst,
+                    owner: &[i32],
+                    nid: usize,
+                    v: u32,
+                    mask: u32,
+                    cost: u64,
+                    out: &mut Vec<(u32, u64)>,
+                ) {
+                    if v == inst.nets[nid].sinks[0] {
+                        out.push((mask, cost));
+                        return;
+                    }
+                    let (x, y) = (v % 4, v / 4);
+                    for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+                        let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                        if !(0..4).contains(&nx) || !(0..4).contains(&ny) {
+                            continue;
+                        }
+                        let u = (ny * 4 + nx) as u32;
+                        if mask & (1 << u) != 0
+                            || owner[u as usize] >= 0
+                            || (inst.pin_owner[u as usize] >= 0
+                                && inst.pin_owner[u as usize] != nid as i32)
+                        {
+                            continue;
+                        }
+                        visit(
+                            inst,
+                            owner,
+                            nid,
+                            u,
+                            mask | (1 << u),
+                            cost + inst.ld[0] as u64,
+                            out,
+                        );
+                    }
+                }
+                let root = inst.nets[nid].driver;
+                let mut out = Vec::new();
+                visit(inst, owner, nid, root, 1 << root, 0, &mut out);
+                out.sort_unstable();
+                out.dedup();
+                out.sort_by_key(|&(mask, cost)| (cost, mask));
+                out
+            }
+            fn choose(pool: &[Vec<(u32, u64)>], at: usize, used: u32, cost: u64, best: &mut u64) {
+                if cost >= *best {
+                    return;
+                }
+                if at == pool.len() {
+                    *best = cost;
+                    return;
+                }
+                for &(mask, extra) in &pool[at] {
+                    if used & mask == 0 {
+                        choose(pool, at + 1, used | mask, cost + extra, best);
+                    }
+                }
+            }
+            let (mut feasible, mut infeasible) = (0, 0);
+            let mut bypasses = 0;
+            let mut probes = 0;
+            for count in 2..=8 {
+                for seed in 0..=8u64 {
+                    let mut p: Vec<u32> = (0..16).collect();
+                    if seed > 0 {
+                        let mut rng = Rng::new(seed * 31 + count as u64);
+                        for i in (1..p.len()).rev() {
+                            let j = rng.below((i + 1) as u64) as usize;
+                            p.swap(i, j);
+                        }
+                    }
+                    let nets: Vec<_> = (0..count)
+                        .map(|i| Net {
+                            driver: p[2 * i],
+                            sinks: vec![p[2 * i + 1]],
+                        })
+                        .collect();
+                    let mut pin_owner = vec![-1; 16];
+                    for (i, net) in nets.iter().enumerate() {
+                        pin_owner[net.driver as usize] = i as i32;
+                        pin_owner[net.sinks[0] as usize] = i as i32;
+                    }
+                    let inst = Inst {
+                        early_stop: true,
+                        retain_negotiated: false,
+                        use_radix: true,
+                        use_dial: true,
+                        use_astar: true,
+                        budget_bound: false,
+                        free_dist: Vec::new(),
+                        check_state: false,
+                        name: "cbs-path-oracle".into(),
+                        w: 4,
+                        h: 4,
+                        l: 1,
+                        wh: 16,
+                        n: 16,
+                        ld: vec![1 + seed as u32 % 3],
+                        vd: 2,
+                        nets,
+                        pin_owner,
+                    };
+                    let mut owner = vec![-1; 16];
+                    if seed % 2 == 1 {
+                        if let Some(v) = (0..16).find(|&v| inst.pin_owner[v] < 0) {
+                            owner[v] = i32::MAX;
+                        }
+                    }
+                    let expected_owner = owner.clone();
+                    let pools: Vec<_> = (0..count).map(|i| paths(&inst, &owner, i)).collect();
+                    let mut oracle = u64::MAX;
+                    choose(&pools, 0, 0, 0, &mut oracle);
+                    let expected = if oracle == u64::MAX {
+                        infeasible += 1;
+                        None
+                    } else {
+                        feasible += 1;
+                        Some(oracle)
+                    };
+                    let group: Vec<_> = (0..count).collect();
+                    let mut ws = Scratch::new(16, count, seed);
+                    ws.cbs_conflict_priority = priority;
+                    let found = if bypass {
+                        search_bypass(
+                            &inst,
+                            &mut owner,
+                            &mut ws,
+                            &group,
+                            expected.unwrap_or(1000),
+                            100_000,
+                            Instant::now() + Duration::from_secs(30),
+                            &mut bypasses,
+                        )
+                    } else {
+                        search(
+                            &inst,
+                            &mut owner,
+                            &mut ws,
+                            &group,
+                            expected.unwrap_or(1000),
+                            100_000,
+                            Instant::now() + Duration::from_secs(30),
+                        )
+                    };
+                    assert_eq!(
+                        found
+                            .as_ref()
+                            .map(|rs| rs.iter().map(|r| r.delay).sum::<u64>()),
+                        expected,
+                        "group={count} seed={seed}"
+                    );
+                    assert_eq!(owner, expected_owner);
+                    if let Some(routes) = found {
+                        let mut used = 0u32;
+                        for route in routes {
+                            let mask = route.verts.iter().fold(0u32, |m, &v| m | (1 << v));
+                            assert_eq!(used & mask, 0);
+                            used |= mask;
+                        }
+                        let below = if bypass {
+                            search_bypass(
+                                &inst,
+                                &mut owner,
+                                &mut ws,
+                                &group,
+                                oracle - 1,
+                                100_000,
+                                Instant::now() + Duration::from_secs(30),
+                                &mut bypasses,
+                            )
+                        } else {
+                            search(
+                                &inst,
+                                &mut owner,
+                                &mut ws,
+                                &group,
+                                oracle - 1,
+                                100_000,
+                                Instant::now() + Duration::from_secs(30),
+                            )
+                        };
+                        assert!(below.is_none());
+                        assert_eq!(owner, expected_owner);
+                    }
+                    probes += ws.cbs_priority_probes;
+                }
+            }
+            assert!(feasible > 0 && infeasible > 0);
+            if priority {
+                assert!(probes > 0, "oracle must exercise conflict-priority probes");
+            }
+            bypasses
+        }
+        #[test]
+        fn cbs_matches_exhaustive_trees() {
+            let mut feasible = 0;
+            let mut infeasible = 0;
+            for seed in 1..=32 {
+                let mut rng = Rng::new(seed);
+                let mut p: Vec<u32> = (0..9).collect();
+                for i in (1..p.len()).rev() {
+                    let j = rng.below((i + 1) as u64) as usize;
+                    p.swap(i, j);
+                }
+                let nets = vec![
+                    Net {
+                        driver: p[0],
+                        sinks: if seed % 2 == 0 {
+                            vec![p[1], p[4]]
+                        } else {
+                            vec![p[1]]
+                        },
+                    },
+                    Net {
+                        driver: p[2],
+                        sinks: vec![p[3]],
+                    },
+                ];
+                let mut pin_owner = vec![-1; 9];
+                for (i, n) in nets.iter().enumerate() {
+                    pin_owner[n.driver as usize] = i as i32;
+                    for &s in &n.sinks {
+                        pin_owner[s as usize] = i as i32;
+                    }
+                }
+                let inst = Inst {
+                    early_stop: true,
+                    retain_negotiated: false,
+                    use_radix: true,
+                    use_dial: true,
+                    use_astar: true,
+                    budget_bound: false,
+                    free_dist: Vec::new(),
+                    check_state: false,
+                    name: "cbs-tiny".into(),
+                    w: 3,
+                    h: 3,
+                    l: 1,
+                    wh: 9,
+                    n: 9,
+                    ld: vec![1 + seed as u32 % 3],
+                    vd: 2,
+                    nets,
+                    pin_owner,
+                };
+                let a = enumerate(&inst, 0);
+                let b = enumerate(&inst, 1);
+                let best = a
+                    .iter()
+                    .flat_map(|a| {
+                        b.iter().filter_map(move |b| {
+                            if a.verts.iter().all(|v| !b.verts.contains(v)) {
+                                Some(a.delay + b.delay)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                    .min();
+                if best.is_some() {
+                    feasible += 1
+                } else {
+                    infeasible += 1
+                }
+                for priority in [false, true] {
+                    let mut owner = vec![-1; 9];
+                    let mut ws = Scratch::new(9, 2, seed);
+                    ws.cbs_conflict_priority = priority;
+                    let found = search(
+                        &inst,
+                        &mut owner,
+                        &mut ws,
+                        &[0, 1],
+                        1000,
+                        100_000,
+                        Instant::now() + Duration::from_secs(5),
+                    );
+                    assert_eq!(
+                        found.map(|rs| rs.iter().map(|r| r.delay).sum::<u64>()),
+                        best,
+                        "seed {seed}"
+                    );
+                    let mut bypasses = 0;
+                    let bypassed = search_bypass(
+                        &inst,
+                        &mut owner,
+                        &mut ws,
+                        &[0, 1],
+                        1000,
+                        100_000,
+                        Instant::now() + Duration::from_secs(5),
+                        &mut bypasses,
+                    );
+                    assert_eq!(
+                        bypassed.map(|rs| rs.iter().map(|r| r.delay).sum::<u64>()),
+                        best,
+                        "branched bypass seed {seed}"
+                    );
+                    assert!(owner.iter().all(|&o| o == -1));
+                    if let Some(best) = best {
+                        assert!(search(
+                            &inst,
+                            &mut owner,
+                            &mut ws,
+                            &[0, 1],
+                            best - 1,
+                            100_000,
+                            Instant::now() + Duration::from_secs(5)
+                        )
+                        .is_none());
+                        assert!(search_bypass(
+                            &inst,
+                            &mut owner,
+                            &mut ws,
+                            &[0, 1],
+                            best - 1,
+                            100_000,
+                            Instant::now() + Duration::from_secs(5),
+                            &mut bypasses,
+                        )
+                        .is_none());
+                        assert!(owner.iter().all(|&o| o == -1));
+                    }
+                }
+            }
+            assert!(feasible > 0 && infeasible > 0);
+        }
+    }
+}
+
+// ------------------------------------------------------------------ rng ----
+struct Rng(u64);
+impl Rng {
+    fn new(seed: u64) -> Self {
+        Rng(seed.wrapping_mul(0x9E3779B97F4A7C15) ^ 0xD1B54A32D192ED03)
+    }
+    #[inline]
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    }
+    #[inline]
+    fn below(&mut self, n: u64) -> u64 {
+        self.next() % n
+    }
+}
+
+// ------------------------------------------------------------- instance ----
+struct Net {
+    driver: u32,
+    sinks: Vec<u32>,
+}
+
+struct Inst {
+    early_stop: bool,
+    retain_negotiated: bool,
+    use_radix: bool,
+    use_dial: bool,
+    use_astar: bool,
+    budget_bound: bool,
+    free_dist: Vec<u32>,
+    check_state: bool,
+    name: String,
+    w: u32,
+    h: u32,
+    l: u32,
+    wh: u32,
+    n: u32,
+    ld: Vec<u32>,
+    vd: u32,
+    nets: Vec<Net>,
+    pin_owner: Vec<i32>,
+}
+
+impl Inst {
+    #[inline(always)]
+    fn xyz(&self, v: u32) -> (u32, u32, u32) {
+        (v % self.w, (v / self.w) % self.h, v / self.wh)
+    }
+    #[inline(always)]
+    fn neigh(&self, v: u32, out: &mut [u32; 6], wts: &mut [u32; 6]) -> usize {
+        let (x, y, z) = self.xyz(v);
+        let lz = self.ld[z as usize];
+        let mut k = 0usize;
+        if x > 0 {
+            out[k] = v - 1;
+            wts[k] = lz;
+            k += 1;
+        }
+        if x + 1 < self.w {
+            out[k] = v + 1;
+            wts[k] = lz;
+            k += 1;
+        }
+        if y > 0 {
+            out[k] = v - self.w;
+            wts[k] = lz;
+            k += 1;
+        }
+        if y + 1 < self.h {
+            out[k] = v + self.w;
+            wts[k] = lz;
+            k += 1;
+        }
+        if z > 0 {
+            out[k] = v - self.wh;
+            wts[k] = self.vd;
+            k += 1;
+        }
+        if z + 1 < self.l {
+            out[k] = v + self.wh;
+            wts[k] = self.vd;
+            k += 1;
+        }
+        k
+    }
+}
+
+fn vid_of(wh: u32, w: u32, x: u64, y: u64, z: u64) -> u32 {
+    (z as u32) * wh + (y as u32) * w + (x as u32)
+}
+
+fn load_inst(path: &str) -> Inst {
+    let raw = std::fs::read_to_string(path).expect("read instance");
+    let d: Value = serde_json::from_str(&raw).expect("parse instance");
+    let w = d["grid"]["width"].as_u64().unwrap() as u32;
+    let h = d["grid"]["height"].as_u64().unwrap() as u32;
+    let l = d["grid"]["layers"].as_u64().unwrap() as u32;
+    let wh = w * h;
+    let n = w * h * l;
+    let ld: Vec<u32> = d["delay"]["layer_delay"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_u64().unwrap() as u32)
+        .collect();
+    let vd = d["delay"]["via_delay"].as_u64().unwrap() as u32;
+    let name = d["name"].as_str().unwrap().to_string();
+    let npins = d["pins"].as_array().unwrap().len();
+    let mut pin_vid = vec![u32::MAX; npins];
+    for p in d["pins"].as_array().unwrap() {
+        let id = p["id"].as_u64().unwrap() as usize;
+        pin_vid[id] = vid_of(
+            wh,
+            w,
+            p["x"].as_u64().unwrap(),
+            p["y"].as_u64().unwrap(),
+            p["z"].as_u64().unwrap(),
+        );
+    }
+    let nnets = d["nets"].as_array().unwrap().len();
+    let mut nets: Vec<Net> = Vec::new();
+    for _ in 0..nnets {
+        nets.push(Net {
+            driver: 0,
+            sinks: Vec::new(),
+        });
+    }
+    let mut pin_owner = vec![-1i32; n as usize];
+    for nt in d["nets"].as_array().unwrap() {
+        let id = nt["id"].as_u64().unwrap() as usize;
+        let driver = pin_vid[nt["driver"].as_u64().unwrap() as usize];
+        let sinks: Vec<u32> = nt["sinks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| pin_vid[s.as_u64().unwrap() as usize])
+            .collect();
+        pin_owner[driver as usize] = id as i32;
+        for &s in &sinks {
+            pin_owner[s as usize] = id as i32;
+        }
+        nets[id] = Net { driver, sinks };
+    }
+    let free_dist = free_space_table(w, h, l, &ld, vd);
+    Inst {
+        early_stop: true,
+        retain_negotiated: false,
+        use_radix: true,
+        use_dial: false,
+        use_astar: true,
+        budget_bound: false,
+        free_dist,
+        check_state: false,
+        name,
+        w,
+        h,
+        l,
+        wh,
+        n,
+        ld,
+        vd,
+        nets,
+        pin_owner,
+    }
+}
+
+// -------------------------------------------------------------- solution ---
+struct Solution {
+    verts: Vec<Vec<u32>>,
+    edges: Vec<Vec<(u32, u32)>>,
+    delay: Vec<u64>,
+    total: u64,
+    vcount: u64,
+}
+
+impl Clone for Solution {
+    fn clone(&self) -> Self {
+        Solution {
+            verts: self.verts.clone(),
+            edges: self.edges.clone(),
+            delay: self.delay.clone(),
+            total: self.total,
+            vcount: self.vcount,
+        }
+    }
+}
+
+fn canon(a: u32, b: u32) -> (u32, u32) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn dbg_note(ws: &Scratch, member: usize, kg: usize, where_: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static DBG_N: AtomicU64 = AtomicU64::new(0);
+    if DBG_N.load(Ordering::Relaxed) < 80 && std::env::var("M3DDBG").is_ok() {
+        DBG_N.fetch_add(1, Ordering::Relaxed);
+        eprintln!(
+            "M3DDBG {where_} member={member}/{kg} reason={} v={} e={}",
+            ws.dbg, ws.vdbg, ws.edbg
+        );
+    }
+}
+
+fn edge_w(inst: &Inst, a: u32, b: u32) -> Option<u32> {
+    let (ax, ay, az) = inst.xyz(a);
+    let (bx, by, bz) = inst.xyz(b);
+    let dx = (ax as i64 - bx as i64).abs();
+    let dy = (ay as i64 - by as i64).abs();
+    let dz = (az as i64 - bz as i64).abs();
+    if dz == 0 && dx + dy == 1 {
+        return Some(inst.ld[az as usize]);
+    }
+    if dx == 0 && dy == 0 && dz == 1 {
+        return Some(inst.vd);
+    }
+    None
+}
+
+fn load_solution(inst: &Inst, path: &str) -> Result<Solution, String> {
+    let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let d: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    if d["format"].as_str() != Some("m3d-submission") {
+        return Err("not an m3d-submission document".into());
+    }
+    let nn = inst.nets.len();
+    let mut verts: Vec<Vec<u32>> = vec![Vec::new(); nn];
+    let mut edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); nn];
+    let mut delay: Vec<u64> = vec![0; nn];
+    let mut seen = vec![false; nn];
+    for r in d["routes"].as_array().ok_or("routes missing")? {
+        let nid = r["net"].as_u64().ok_or("net id")? as usize;
+        if nid >= nn {
+            return Err(format!("net {nid} out of range"));
+        }
+        if seen[nid] {
+            return Err(format!("net {nid} duplicated"));
+        }
+        seen[nid] = true;
+        let mut es: Vec<(u32, u32)> = Vec::new();
+        let mut vs: std::collections::HashSet<u32> = std::collections::HashSet::new();
+        for e in r["edges"].as_array().ok_or("edges missing")? {
+            if e.as_array().map(|x| x.len()) != Some(2) {
+                return Err("edge must have two endpoints".into());
+            }
+            let a = &e[0];
+            let b = &e[1];
+            for p in [a, b] {
+                if p.as_array().map(|x| x.len()) != Some(3) {
+                    return Err("vertex must have three coordinates".into());
+                }
+                let x = p[0].as_u64().ok_or("invalid x coordinate")?;
+                let y = p[1].as_u64().ok_or("invalid y coordinate")?;
+                let z = p[2].as_u64().ok_or("invalid z coordinate")?;
+                if x >= inst.w as u64 || y >= inst.h as u64 || z >= inst.l as u64 {
+                    return Err(format!("coordinate out of bounds, net {nid}"));
+                }
+            }
+            let ia = vid_of(
+                inst.wh,
+                inst.w,
+                a[0].as_u64().unwrap(),
+                a[1].as_u64().unwrap(),
+                a[2].as_u64().unwrap(),
+            );
+            let ib = vid_of(
+                inst.wh,
+                inst.w,
+                b[0].as_u64().unwrap(),
+                b[1].as_u64().unwrap(),
+                b[2].as_u64().unwrap(),
+            );
+            if ia >= inst.n || ib >= inst.n {
+                return Err(format!("edge out of bounds, net {nid}"));
+            }
+            if edge_w(inst, ia, ib).is_none() {
+                return Err(format!("illegal move {ia}-{ib}, net {nid}"));
+            }
+            es.push(canon(ia, ib));
+            vs.insert(ia);
+            vs.insert(ib);
+        }
+        vs.insert(inst.nets[nid].driver);
+        for &s in &inst.nets[nid].sinks {
+            vs.insert(s);
+        }
+        es.sort_unstable();
+        if es.windows(2).any(|w| w[0] == w[1]) {
+            return Err(format!("duplicate edge, net {nid}"));
+        }
+        es.dedup();
+        // BFS from driver for tree structure + delays
+        use std::collections::{HashMap, VecDeque};
+        let mut adj: HashMap<u32, Vec<u32>> = HashMap::new();
+        for &(x, y) in &es {
+            adj.entry(x).or_default().push(y);
+            adj.entry(y).or_default().push(x);
+        }
+        let mut dist: HashMap<u32, u64> = HashMap::new();
+        dist.insert(inst.nets[nid].driver, 0);
+        let mut q: VecDeque<u32> = VecDeque::new();
+        q.push_back(inst.nets[nid].driver);
+        while let Some(u) = q.pop_front() {
+            let du = dist[&u];
+            if let Some(ns) = adj.get(&u) {
+                for &v in ns {
+                    if !dist.contains_key(&v) {
+                        let w = edge_w(inst, u, v).unwrap() as u64;
+                        dist.insert(v, du + w);
+                        q.push_back(v);
+                    }
+                }
+            }
+        }
+        let mut t: u64 = 0;
+        for &s in &inst.nets[nid].sinks {
+            match dist.get(&s) {
+                Some(&dd) => t += dd,
+                None => return Err(format!("net {nid}: sink {s} disconnected")),
+            }
+        }
+        if dist.len() != vs.len() {
+            return Err(format!(
+                "net {nid}: {} reachable of {} vertices (disconnected)",
+                dist.len(),
+                vs.len()
+            ));
+        }
+        if es.len() + 1 != vs.len() {
+            return Err(format!(
+                "net {nid}: not a tree: {} edges, {} vertices",
+                es.len(),
+                vs.len()
+            ));
+        }
+        for &v in &vs {
+            let po = inst.pin_owner[v as usize];
+            if po >= 0 && po != nid as i32 {
+                return Err(format!("net {nid} passes through pin of net {po}"));
+            }
+        }
+        let mut vv: Vec<u32> = vs.into_iter().collect();
+        vv.sort_unstable();
+        delay[nid] = t;
+        verts[nid] = vv;
+        edges[nid] = es;
+    }
+    let mut total = 0u64;
+    for nid in 0..nn {
+        if !seen[nid] {
+            return Err(format!("net {nid} missing"));
+        }
+        total += delay[nid];
+    }
+    let mut owner = vec![-1i32; inst.n as usize];
+    for nid in 0..nn {
+        for &v in &verts[nid] {
+            if owner[v as usize] != -1 {
+                return Err(format!(
+                    "vertex {v} shared by nets {} and {nid}",
+                    owner[v as usize]
+                ));
+            }
+            owner[v as usize] = nid as i32;
+        }
+    }
+    let vcount: u64 = verts.iter().map(|v| v.len() as u64).sum();
+    Ok(Solution {
+        verts,
+        edges,
+        delay,
+        total,
+        vcount,
+    })
+}
+
+fn write_sol(inst: &Inst, sol: &Solution, path: &str) -> std::io::Result<()> {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let f = File::create(path)?;
+    let mut w = BufWriter::new(f);
+    write!(
+        w,
+        "{{\"format\":\"m3d-submission\",\"version\":1,\"instance\":\"{}\",\"routes\":[",
+        inst.name
+    )?;
+    for nid in 0..inst.nets.len() {
+        if nid > 0 {
+            write!(w, ",")?;
+        }
+        write!(w, "{{\"net\":{},\"edges\":[", nid)?;
+        let mut first = true;
+        for &(a, b) in &sol.edges[nid] {
+            let (ax, ay, az) = inst.xyz(a);
+            let (bx, by, bz) = inst.xyz(b);
+            if !first {
+                write!(w, ",")?;
+            }
+            first = false;
+            write!(w, "[[{},{},{}],[{},{},{}]]", ax, ay, az, bx, by, bz)?;
+        }
+        write!(w, "]}}")?;
+    }
+    write!(w, "]}}\n")?;
+    Ok(())
+}
+
+// ------------------------------------------------------------ worker ctx ---
+const INF: u32 = u32::MAX;
+
+// Minimum obstacle-free L1 distance to any sink, using the cheapest planar
+// layer. This lower bound is consistent on every legal physical edge, even
+// with arbitrary foreign routes removed from the graph.
+#[inline]
+fn goal_bound(inst: &Inst, goals: &[(u32, u32, u32)], v: u32, planar: u32) -> u32 {
+    let (x, y, z) = inst.xyz(v);
+    goals
+        .iter()
+        .map(|&(a, b, c)| {
+            let m = x.abs_diff(a) + y.abs_diff(b);
+            if inst.free_dist.is_empty() {
+                planar * m + inst.vd * z.abs_diff(c)
+            } else {
+                inst.free_dist[((z * inst.l + c) * (inst.w + inst.h - 1) + m) as usize]
+            }
+        })
+        .min()
+        .unwrap_or(0)
+}
+
+fn free_space_table(w: u32, h: u32, l: u32, ld: &[u32], vd: u32) -> Vec<u32> {
+    let mut table = Vec::with_capacity((l * l * (w + h - 1)) as usize);
+    for a in 0..l {
+        for b in 0..l {
+            for m in 0..w + h - 1 {
+                table.push(
+                    (0..l)
+                        .map(|k| ld[k as usize] * m + vd * (a.abs_diff(k) + b.abs_diff(k)))
+                        .min()
+                        .unwrap(),
+                );
+            }
+        }
+    }
+    table
+}
+
+/// Monotone integer priority queue. Dijkstra only inserts keys at least as
+/// large as the last popped key. Bucket zero holds the current minimum.
+struct RadixHeap {
+    buckets: [Vec<(u32, u32)>; 33],
+    last: u32,
+    len: usize,
+}
+impl RadixHeap {
+    fn new() -> Self {
+        Self {
+            buckets: std::array::from_fn(|_| Vec::new()),
+            last: 0,
+            len: 0,
+        }
+    }
+    fn clear(&mut self) {
+        for b in &mut self.buckets {
+            b.clear();
+        }
+        self.last = 0;
+        self.len = 0;
+    }
+    fn push(&mut self, key: u32, v: u32) {
+        debug_assert!(key >= self.last);
+        let b = (32 - (key ^ self.last).leading_zeros()) as usize;
+        self.buckets[b].push((key, v));
+        self.len += 1;
+    }
+    fn pop(&mut self) -> Option<(u32, u32)> {
+        if self.len == 0 {
+            return None;
+        }
+        if self.buckets[0].is_empty() {
+            let i = (1..33).find(|&i| !self.buckets[i].is_empty()).unwrap();
+            self.last = self.buckets[i].iter().map(|x| x.0).min().unwrap();
+            let mut pending = std::mem::take(&mut self.buckets[i]);
+            for (k, v) in pending.drain(..) {
+                let b = (32 - (k ^ self.last).leading_zeros()) as usize;
+                self.buckets[b].push((k, v));
+            }
+            self.buckets[i] = pending;
+        }
+        self.len -= 1;
+        self.buckets[0].pop()
+    }
+}
+
+/// A circular Dial queue for small integer reduced costs. Both physical
+/// potentials are minima of symmetric 1-Lipschitz distances minus constants,
+/// so 0 <= w(u,v)+h(v)-h(u) <= 2*w(u,v). A power-of-two window strictly
+/// larger than 2*max_weight therefore cannot alias live priorities.
+struct DialQueue {
+    buckets: Vec<Vec<(u32, u32)>>,
+    cursor: u32,
+    mask: u32,
+    len: usize,
+}
+impl DialQueue {
+    fn new() -> Self {
+        Self {
+            buckets: Vec::new(),
+            cursor: 0,
+            mask: 0,
+            len: 0,
+        }
+    }
+    fn reset(&mut self, inst: &Inst, first: u32) -> bool {
+        let max_weight = inst.vd.max(*inst.ld.iter().max().unwrap());
+        if max_weight > 2047 {
+            return false;
+        } // Keep the radix fallback for wide costs.
+        self.reset_range(2 * max_weight, first)
+    }
+    fn reset_range(&mut self, max_reduced_cost: u32, first: u32) -> bool {
+        if max_reduced_cost > 4094 {
+            return false;
+        }
+        let width = (max_reduced_cost + 1).next_power_of_two() as usize;
+        if self.buckets.len() != width {
+            self.buckets = (0..width).map(|_| Vec::new()).collect();
+        } else {
+            for bucket in &mut self.buckets {
+                bucket.clear();
+            }
+        }
+        self.cursor = first;
+        self.mask = width as u32 - 1;
+        self.len = 0;
+        true
+    }
+    #[inline]
+    fn push(&mut self, key: u32, v: u32) {
+        debug_assert!(key >= self.cursor && key - self.cursor <= self.mask);
+        self.buckets[(key & self.mask) as usize].push((key, v));
+        self.len += 1;
+    }
+    #[inline]
+    fn pop(&mut self) -> Option<(u32, u32)> {
+        if self.len == 0 {
+            return None;
+        }
+        loop {
+            if let Some(pair) = self.buckets[(self.cursor & self.mask) as usize].pop() {
+                debug_assert_eq!(pair.0, self.cursor);
+                self.len -= 1;
+                return Some(pair);
+            }
+            self.cursor += 1;
+        }
+    }
+}
+
+struct Scratch {
+    dist: Vec<u32>,
+    stamp: Vec<u32>,
+    cur: u32,
+    heap: BinaryHeap<Reverse<(u32, u32)>>,
+    radix: RadixHeap,
+    dial: DialQueue,
+    gstamp: Vec<u32>,
+    gcur: u32,
+    rng: Rng,
+    eset: std::collections::HashSet<u64>,
+    // --- negotiated (penalized) search state ---
+    pcur: u32,
+    pdist: Vec<f64>,
+    pstamp: Vec<u32>,
+    pheap: BinaryHeap<Reverse<(u64, u64, u32)>>,
+    pheuristic: Vec<f64>,
+    penalized_heuristic_cache: bool,
+    pen_h_evaluations: u64,
+    cbs_bypasses: u64,
+    cbs_conflict_priority: bool,
+    cbs_priority_probes: u64,
+    penalized_astar: bool,
+    penalized_integer_queue: bool,
+    pen_integer_calls: u64,
+    pen_expanded: u64,
+    ncur: u32,
+    pcv: Vec<u32>,
+    pvst: Vec<u32>,
+    phv: Vec<f64>,
+    pce: std::collections::HashMap<u64, u32>,
+    phe: std::collections::HashMap<u64, f64>,
+    entry_owner: Vec<i32>,
+    direct_chain_prices: Option<bool>,
+    par: Vec<u32>,
+    par_stamp: Vec<u32>,
+    xcur: u32,
+    dbg: u8,
+    vdbg: u32,
+    edbg: u32,
+}
+
+impl Scratch {
+    fn new(n: u32, nn: usize, seed: u64) -> Self {
+        Scratch {
+            dist: vec![INF; n as usize],
+            stamp: vec![0; n as usize],
+            cur: 0,
+            heap: BinaryHeap::new(),
+            radix: RadixHeap::new(),
+            dial: DialQueue::new(),
+            gstamp: vec![0; nn],
+            gcur: 0,
+            rng: Rng::new(seed),
+            eset: std::collections::HashSet::with_capacity(256),
+            pcur: 0,
+            pdist: vec![0.0; n as usize],
+            pstamp: vec![0; n as usize],
+            pheap: BinaryHeap::new(),
+            pheuristic: vec![0.0; n as usize],
+            penalized_heuristic_cache: false,
+            pen_h_evaluations: 0,
+            cbs_bypasses: 0,
+            cbs_conflict_priority: false,
+            cbs_priority_probes: 0,
+            penalized_astar: false,
+            penalized_integer_queue: false,
+            pen_integer_calls: 0,
+            pen_expanded: 0,
+            ncur: 0,
+            pcv: vec![0; n as usize],
+            pvst: vec![0; n as usize],
+            phv: vec![0.0; n as usize],
+            pce: std::collections::HashMap::new(),
+            phe: std::collections::HashMap::new(),
+            entry_owner: Vec::new(),
+            direct_chain_prices: None,
+            par: vec![0; n as usize],
+            par_stamp: vec![0; n as usize],
+            xcur: 0,
+            dbg: 0,
+            vdbg: 0,
+            edbg: 0,
+        }
+    }
+
+    /// Exact Dijkstra. Blocking: all pins of another net; when `pins_only`
+    /// is false, also all vertices owned by another net (the real graph).
+    fn dijkstra(
+        &mut self,
+        inst: &Inst,
+        owner: &[i32],
+        src: u32,
+        me: i32,
+        pins_only: bool,
+        cutoff: u32,
+    ) {
+        self.cur += 1;
+        let st = self.cur;
+        self.heap.clear();
+        self.radix.clear();
+        self.dist[src as usize] = 0;
+        self.stamp[src as usize] = st;
+        let astar = inst.use_astar && inst.early_stop && inst.nets[me as usize].sinks.len() <= 4;
+        let goals: Vec<_> = if astar {
+            inst.nets[me as usize]
+                .sinks
+                .iter()
+                .map(|&s| inst.xyz(s))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let planar = *inst.ld.iter().min().unwrap();
+        let first = if astar {
+            goal_bound(inst, &goals, src, planar)
+        } else {
+            0
+        };
+        let dial = inst.use_dial && self.dial.reset(inst, first);
+        if dial {
+            self.dial.push(first, src);
+        } else if inst.use_radix {
+            self.radix.push(first, src);
+        } else {
+            self.heap.push(Reverse((first, src)));
+        }
+        let mut remaining = inst.nets[me as usize].sinks.len();
+        let mut finish_at: Option<u32> = None;
+        let mut nb = [0u32; 6];
+        let mut wb = [0u32; 6];
+        loop {
+            let entry = if dial {
+                self.dial.pop()
+            } else if inst.use_radix {
+                self.radix.pop()
+            } else {
+                self.heap.pop().map(|Reverse(p)| p)
+            };
+            let Some((key, v)) = entry else {
+                break;
+            };
+            if key > cutoff || finish_at.is_some_and(|limit| key > limit) {
+                break;
+            }
+            let d = if astar {
+                key - goal_bound(inst, &goals, v, planar)
+            } else {
+                key
+            };
+            if self.stamp[v as usize] != st || self.dist[v as usize] != d {
+                continue;
+            }
+            // All positive-weight predecessors of a settled sink are settled.
+            // Once the last sink is settled, extraction has the complete tight
+            // predecessor DAG it needs; the rest of the grid cannot help.
+            if inst.pin_owner[v as usize] == me && inst.nets[me as usize].sinks.contains(&v) {
+                remaining -= 1;
+                if remaining == 0 && inst.early_stop {
+                    if !astar {
+                        break;
+                    }
+                    // Finish the whole f<=largest_sink_distance plateau. Every
+                    // tight predecessor of every sink lies in this set. Thus
+                    // exact distances AND all equal-cost tree choices survive.
+                    finish_at = Some(d);
+                    continue;
+                }
+            }
+            let k = inst.neigh(v, &mut nb, &mut wb);
+            for i in 0..k {
+                let u = nb[i];
+                {
+                    let p = inst.pin_owner[u as usize];
+                    if p >= 0 && p != me {
+                        continue;
+                    }
+                    if !pins_only {
+                        let o = owner[u as usize];
+                        if o >= 0 && o != me {
+                            continue;
+                        }
+                    }
+                }
+                let nd = d + wb[i];
+                let ui = u as usize;
+                if self.stamp[ui] != st || nd < self.dist[ui] {
+                    self.stamp[ui] = st;
+                    self.dist[ui] = nd;
+                    let priority = nd
+                        + if astar {
+                            goal_bound(inst, &goals, u, planar)
+                        } else {
+                            0
+                        };
+                    if dial {
+                        self.dial.push(priority, u);
+                    } else if inst.use_radix {
+                        self.radix.push(priority, u);
+                    } else {
+                        self.heap.push(Reverse((priority, u)));
+                    }
+                }
+            }
+        }
+        // A cutoff must not expose tentative sink labels as an exact SPT.
+        // Fail extraction before consuming random tie choices if any sink was
+        // not settled within the permitted bound.
+        if remaining != 0 {
+            for &sink in &inst.nets[me as usize].sinks {
+                self.stamp[sink as usize] = 0;
+            }
+        }
+    }
+
+    /// Exact multi-goal search with a feasible upper bound B_i for each sink.
+    /// h(v)=min_i(H(v,s_i)-B_i) is consistent. Any shortest path to sink i
+    /// satisfies g(v)+h(v)<=d_i-B_i<=0, so pruning outside this union is safe.
+    /// Shift by -h(root) for nonnegative monotone radix keys. Finish the
+    /// complete tight-predecessor plateau after all goals settle.
+    fn dijkstra_bounded(
+        &mut self,
+        inst: &Inst,
+        owner: &[i32],
+        nid: usize,
+        budgets: &[u32],
+        pins_only: bool,
+    ) {
+        let net = &inst.nets[nid];
+        let src = net.driver;
+        assert_eq!(budgets.len(), net.sinks.len());
+        let goals: Vec<_> = net
+            .sinks
+            .iter()
+            .zip(budgets)
+            .map(|(&s, &b)| (inst.xyz(s), b))
+            .collect();
+        let planar = *inst.ld.iter().min().unwrap();
+        let potential = |v: u32| -> i64 {
+            let (x, y, z) = inst.xyz(v);
+            goals
+                .iter()
+                .map(|&((a, b, c), bound)| {
+                    let m = x.abs_diff(a) + y.abs_diff(b);
+                    let d = if inst.free_dist.is_empty() {
+                        planar * m + inst.vd * z.abs_diff(c)
+                    } else {
+                        inst.free_dist[((z * inst.l + c) * (inst.w + inst.h - 1) + m) as usize]
+                    };
+                    d as i64 - bound as i64
+                })
+                .min()
+                .unwrap_or(0)
+        };
+        let shift = -potential(src);
+        self.cur += 1;
+        let st = self.cur;
+        self.heap.clear();
+        self.radix.clear();
+        self.dist[src as usize] = 0;
+        self.stamp[src as usize] = st;
+        if shift < 0 {
+            for &s in &net.sinks {
+                self.stamp[s as usize] = 0;
+            }
+            return;
+        }
+        let dial = inst.use_dial && self.dial.reset(inst, 0);
+        if dial {
+            self.dial.push(0, src);
+        } else {
+            self.radix.push(0, src);
+        }
+        let mut remaining = net.sinks.len();
+        let mut finish = shift;
+        let mut nb = [0; 6];
+        let mut wb = [0; 6];
+        while let Some((key, v)) = if dial {
+            self.dial.pop()
+        } else {
+            self.radix.pop()
+        } {
+            if key as i64 > finish {
+                break;
+            }
+            let d = (key as i64 - potential(v) - shift) as u32;
+            if self.stamp[v as usize] != st || self.dist[v as usize] != d {
+                continue;
+            }
+            if inst.pin_owner[v as usize] == nid as i32 && net.sinks.contains(&v) {
+                remaining -= 1;
+                if remaining == 0 {
+                    finish = net
+                        .sinks
+                        .iter()
+                        .zip(budgets)
+                        .map(|(&s, &b)| self.dist[s as usize] as i64 - b as i64 + shift)
+                        .max()
+                        .unwrap_or(0);
+                }
+            }
+            let count = inst.neigh(v, &mut nb, &mut wb);
+            for k in 0..count {
+                let u = nb[k];
+                let ui = u as usize;
+                let pin = inst.pin_owner[ui];
+                if pin >= 0 && pin != nid as i32 {
+                    continue;
+                }
+                if !pins_only && owner[ui] >= 0 && owner[ui] != nid as i32 {
+                    continue;
+                }
+                let nd = d + wb[k];
+                let f = nd as i64 + potential(u);
+                if f > 0 {
+                    continue;
+                }
+                if self.stamp[ui] != st || nd < self.dist[ui] {
+                    self.stamp[ui] = st;
+                    self.dist[ui] = nd;
+                    if dial {
+                        self.dial.push((f + shift) as u32, u);
+                    } else {
+                        self.radix.push((f + shift) as u32, u);
+                    }
+                }
+            }
+        }
+        if remaining != 0
+            || net
+                .sinks
+                .iter()
+                .zip(budgets)
+                .any(|(&s, &b)| self.dist[s as usize] > b)
+        {
+            for &s in &net.sinks {
+                self.stamp[s as usize] = 0;
+            }
+        }
+    }
+
+    /// Shortest-path tree to every sink from the last dijkstra call,
+    /// randomizing among equal-cost tight predecessors.
+    fn extract(&mut self, inst: &Inst, net: &Net) -> Option<(Vec<u32>, Vec<(u32, u32)>, u64)> {
+        let st = self.cur;
+        let mut verts: Vec<u32> = Vec::with_capacity(96);
+        let mut edges: Vec<(u32, u32)> = Vec::with_capacity(96);
+        self.eset.clear();
+        let mut delay = 0u64;
+        let mut nb = [0u32; 6];
+        let mut wb = [0u32; 6];
+        self.xcur += 1;
+        let xid = self.xcur;
+        verts.push(net.driver);
+        for &sink in &net.sinks {
+            if self.stamp[sink as usize] != st {
+                self.dbg = 1;
+                return None;
+            }
+            delay += self.dist[sink as usize] as u64;
+            verts.push(sink);
+            let mut cur = sink;
+            let mut guard = 0u32;
+            while cur != net.driver {
+                guard += 1;
+                if guard > 2_000_000 {
+                    self.dbg = 2;
+                    return None;
+                }
+                let pick: u32;
+                if self.par_stamp[cur as usize] == xid {
+                    pick = self.par[cur as usize];
+                } else {
+                    let k = inst.neigh(cur, &mut nb, &mut wb);
+                    let mut picks: [u32; 6] = [0; 6];
+                    let mut np = 0usize;
+                    let dcur = self.dist[cur as usize];
+                    for i in 0..k {
+                        let u = nb[i];
+                        if self.stamp[u as usize] != st {
+                            continue;
+                        }
+                        let du = self.dist[u as usize];
+                        if du != INF && du + wb[i] == dcur {
+                            picks[np] = u;
+                            np += 1;
+                        }
+                    }
+                    if np == 0 {
+                        self.dbg = 3;
+                        return None;
+                    }
+                    pick = picks[self.rng.below(np as u64) as usize];
+                    self.par[cur as usize] = pick;
+                    self.par_stamp[cur as usize] = xid;
+                }
+                let ce = canon(pick, cur);
+                let key = (ce.0 as u64) << 32 | ce.1 as u64;
+                if self.eset.insert(key) {
+                    edges.push(ce);
+                }
+                verts.push(pick);
+                cur = pick;
+            }
+        }
+        verts.sort_unstable();
+        verts.dedup();
+        if edges.len() + 1 != verts.len() {
+            self.dbg = 4;
+            self.vdbg = verts.len() as u32;
+            self.edbg = edges.len() as u32;
+            return None;
+        }
+        Some((verts, edges, delay))
+    }
+
+    // Match a full (distance, vertex)-ordered Dijkstra that keeps the first
+    // predecessor on equal distance. Positive weights let us recover that
+    // predecessor as min(distance[predecessor], predecessor) in the tight DAG.
+    fn extract_stable(&self, inst: &Inst, net: &Net) -> Option<(Vec<u32>, Vec<(u32, u32)>, u64)> {
+        self.extract_stable_order(inst, net, false)
+    }
+    fn extract_stable_order(
+        &self,
+        inst: &Inst,
+        net: &Net,
+        reverse_vertices: bool,
+    ) -> Option<(Vec<u32>, Vec<(u32, u32)>, u64)> {
+        let mut edges = Vec::new();
+        let mut delay = 0;
+        let mut nb = [0u32; 6];
+        let mut wb = [0u32; 6];
+        for &sink in &net.sinks {
+            if self.stamp[sink as usize] != self.cur {
+                return None;
+            }
+            delay += self.dist[sink as usize] as u64;
+            let mut v = sink;
+            while v != net.driver {
+                let count = inst.neigh(v, &mut nb, &mut wb);
+                let parent = (0..count)
+                    .filter_map(|i| {
+                        let u = nb[i];
+                        if self.stamp[u as usize] == self.cur
+                            && self.dist[u as usize].checked_add(wb[i])
+                                == Some(self.dist[v as usize])
+                        {
+                            Some((
+                                self.dist[u as usize],
+                                if reverse_vertices { u32::MAX - u } else { u },
+                                u,
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .min()?
+                    .2;
+                edges.push(canon(parent, v));
+                v = parent;
+            }
+        }
+        edges.sort_unstable();
+        edges.dedup();
+        let mut vertices = vec![net.driver];
+        vertices.extend(edges.iter().flat_map(|&(a, b)| [a, b]));
+        vertices.sort_unstable();
+        vertices.dedup();
+        assert_eq!(edges.len() + 1, vertices.len());
+        Some((vertices, edges, delay))
+    }
+
+    /// Penalized (negotiated) Dijkstra with f64 costs. Vertices occupied by
+    /// nets in `ing` (the negotiation group) are soft â€” penalized instead of
+    /// hard-blocked. Foreign vertices and foreign pins stay hard obstacles.
+    fn pdijkstra(
+        &mut self,
+        inst: &Inst,
+        owner: &[i32],
+        ing: &[bool],
+        me: i32,
+        src: u32,
+        pres_fac: f64,
+        vcong: f64,
+    ) {
+        match self.direct_chain_prices {
+            Some(true) => {
+                self.pdijkstra_impl::<true, true>(inst, owner, ing, me, src, pres_fac, vcong)
+            }
+            Some(false) => {
+                self.pdijkstra_impl::<true, false>(inst, owner, ing, me, src, pres_fac, vcong)
+            }
+            None => self.pdijkstra_impl::<false, false>(inst, owner, ing, me, src, pres_fac, vcong),
+        }
+    }
+
+    fn pdijkstra_impl<const CHAIN: bool, const ENTRY: bool>(
+        &mut self,
+        inst: &Inst,
+        owner: &[i32],
+        ing: &[bool],
+        me: i32,
+        src: u32,
+        pres_fac: f64,
+        vcong: f64,
+    ) {
+        self.pcur += 1;
+        let st = self.pcur;
+        let ng = self.ncur;
+        self.pheap.clear();
+        self.pdist[src as usize] = 0.0;
+        self.pstamp[src as usize] = st;
+        // Physical distance is a consistent lower bound because all congestion
+        // charges are nonnegative. Store g separately: subtracting h from f
+        // would lose floating-point bits needed by exact tight-edge extraction.
+        let astar =
+            self.penalized_astar && inst.early_stop && inst.nets[me as usize].sinks.len() <= 8;
+        let goals: Vec<_> = if astar {
+            inst.nets[me as usize]
+                .sinks
+                .iter()
+                .map(|&s| inst.xyz(s))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let planar = *inst.ld.iter().min().unwrap();
+        let mut h_evaluations = 0u64;
+        let mut potential = |v| {
+            if astar {
+                h_evaluations += 1;
+                goal_bound(inst, &goals, v, planar) as f64
+            } else {
+                0.0
+            }
+        };
+        // Direct chain prices are quarter-integers with no history or edge
+        // multipliers. Scale their exact priorities by four and use monotone
+        // integer queues. Keep the floating heap for every other cost model.
+        // The simple-path bound also ensures all scaled priorities fit u32.
+        let max_weight = inst.vd.max(*inst.ld.iter().max().unwrap()) as f64;
+        let quarter_price = pres_fac * 4.0;
+        let integer = self.penalized_integer_queue
+            && CHAIN
+            && vcong == 1.0
+            && pres_fac >= 0.0
+            && quarter_price.is_finite()
+            && quarter_price.fract() == 0.0
+            && 4.0
+                * (inst.n as f64 * (max_weight + pres_fac)
+                    + (inst.w as f64 + inst.h as f64 + inst.l as f64) * max_weight)
+                < u32::MAX as f64;
+        let first = potential(src);
+        let cache = self.penalized_heuristic_cache && astar;
+        if cache {
+            self.pheuristic[src as usize] = first;
+        }
+        let dial = integer
+            && self.dial.reset_range(
+                (8.0 * max_weight + quarter_price) as u32,
+                (first * 4.0) as u32,
+            );
+        if integer {
+            self.pen_integer_calls += 1;
+            if dial {
+                self.dial.push((first * 4.0) as u32, src);
+            } else {
+                self.radix.clear();
+                self.radix.push((first * 4.0) as u32, src);
+            }
+        } else {
+            self.pheap.push(Reverse((first.to_bits(), 0u64, src)));
+        }
+        let mut remaining = inst.nets[me as usize].sinks.len();
+        let mut finish_at = f64::INFINITY;
+        let mut nb = [0u32; 6];
+        let mut wb = [0u32; 6];
+        loop {
+            let (priority, kb, v) = if integer {
+                let popped = if dial {
+                    self.dial.pop()
+                } else {
+                    self.radix.pop()
+                };
+                let Some((key, v)) = popped else { break };
+                let d = self.pdist[v as usize];
+                if self.pstamp[v as usize] != st {
+                    continue;
+                }
+                let h = if cache {
+                    self.pheuristic[v as usize]
+                } else {
+                    potential(v)
+                };
+                if key != ((d + h) * 4.0) as u32 {
+                    continue;
+                }
+                (key as f64 * 0.25, d.to_bits(), v)
+            } else {
+                let Some(Reverse((priority, kb, v))) = self.pheap.pop() else {
+                    break;
+                };
+                (f64::from_bits(priority), kb, v)
+            };
+            if priority > finish_at {
+                break;
+            }
+            let d = f64::from_bits(kb);
+            if self.pstamp[v as usize] != st || self.pdist[v as usize] != d {
+                continue;
+            }
+            self.pen_expanded += 1;
+            if inst.early_stop
+                && inst.pin_owner[v as usize] == me
+                && inst.nets[me as usize].sinks.contains(&v)
+            {
+                remaining -= 1;
+                if remaining == 0 {
+                    if !astar {
+                        break;
+                    }
+                    // Preserve every equal-cost predecessor choice, including
+                    // vertices on the last sink's equal-f plateau.
+                    finish_at = d;
+                    continue;
+                }
+            }
+            let k = inst.neigh(v, &mut nb, &mut wb);
+            for i in 0..k {
+                let u = nb[i];
+                let p = inst.pin_owner[u as usize];
+                if p >= 0 && p != me {
+                    continue;
+                }
+                let o = owner[u as usize];
+                if o >= 0 && o != me && !ing[o as usize] {
+                    continue;
+                }
+                let mut vcost = if CHAIN {
+                    if owner[u as usize] >= 0 && (!ENTRY || owner[u as usize] != owner[v as usize])
+                    {
+                        pres_fac
+                    } else {
+                        0.0
+                    }
+                } else if self.pvst[u as usize] == ng {
+                    self.phv[u as usize] + pres_fac * self.pcv[u as usize] as f64
+                } else {
+                    0.0
+                };
+                if !CHAIN
+                    && !self.entry_owner.is_empty()
+                    && owner[u as usize] >= 0
+                    && owner[u as usize] == owner[v as usize]
+                {
+                    vcost = 0.0;
+                }
+                let ek = ekey(v, u);
+                let he = if CHAIN {
+                    0.0
+                } else {
+                    self.phe.get(&ek).copied().unwrap_or(0.0)
+                };
+                let pe = if CHAIN {
+                    0.0
+                } else {
+                    self.pce.get(&ek).copied().unwrap_or(0) as f64
+                };
+                let nd = d + (wb[i] as f64) * (1.0 + he + pres_fac * pe) + vcong * vcost;
+                let ui = u as usize;
+                if self.pstamp[ui] != st || nd < self.pdist[ui] {
+                    // Goals stay fixed for this call. The distance stamp also
+                    // certifies the cache, assigned before a vertex is stamped.
+                    let h = if cache && self.pstamp[ui] == st {
+                        self.pheuristic[ui]
+                    } else {
+                        let value = potential(u);
+                        if cache {
+                            self.pheuristic[ui] = value;
+                        }
+                        value
+                    };
+                    self.pstamp[ui] = st;
+                    self.pdist[ui] = nd;
+                    let priority = nd + h;
+                    if integer {
+                        let key = (priority * 4.0) as u32;
+                        if dial {
+                            self.dial.push(key, u)
+                        } else {
+                            self.radix.push(key, u)
+                        }
+                    } else {
+                        self.pheap
+                            .push(Reverse((priority.to_bits(), nd.to_bits(), u)));
+                    }
+                }
+            }
+        }
+        self.pen_h_evaluations += h_evaluations;
+    }
+
+    /// Tree extraction for the penalized search, mirroring `extract` but with
+    /// f64 distances and identical cost arithmetic (so tight edges compare
+    /// bit-exactly). Random tie-breaking among equally tight predecessors.
+    fn extract_pen(
+        &mut self,
+        inst: &Inst,
+        net: &Net,
+        pres_fac: f64,
+        vcong: f64,
+    ) -> Option<(Vec<u32>, Vec<(u32, u32)>)> {
+        self.extract_pen_with_owner(inst, net, pres_fac, vcong, None)
+    }
+
+    fn extract_pen_with_owner(
+        &mut self,
+        inst: &Inst,
+        net: &Net,
+        pres_fac: f64,
+        vcong: f64,
+        chain_owner: Option<&[i32]>,
+    ) -> Option<(Vec<u32>, Vec<(u32, u32)>)> {
+        match self.direct_chain_prices {
+            Some(true) => {
+                self.extract_pen_impl::<true, true>(inst, net, pres_fac, vcong, chain_owner)
+            }
+            Some(false) => {
+                self.extract_pen_impl::<true, false>(inst, net, pres_fac, vcong, chain_owner)
+            }
+            None => self.extract_pen_impl::<false, false>(inst, net, pres_fac, vcong, chain_owner),
+        }
+    }
+
+    fn extract_pen_impl<const CHAIN: bool, const ENTRY: bool>(
+        &mut self,
+        inst: &Inst,
+        net: &Net,
+        pres_fac: f64,
+        vcong: f64,
+        chain_owner: Option<&[i32]>,
+    ) -> Option<(Vec<u32>, Vec<(u32, u32)>)> {
+        let st = self.pcur;
+        let ng = self.ncur;
+        let mut verts: Vec<u32> = Vec::with_capacity(96);
+        let mut edges: Vec<(u32, u32)> = Vec::with_capacity(96);
+        self.eset.clear();
+        let mut nb = [0u32; 6];
+        let mut wb = [0u32; 6];
+        self.xcur += 1;
+        let xid = self.xcur;
+        verts.push(net.driver);
+        for &sink in &net.sinks {
+            if self.pstamp[sink as usize] != st {
+                self.dbg = 5;
+                return None;
+            }
+            verts.push(sink);
+            let mut cur = sink;
+            let mut guard = 0u32;
+            while cur != net.driver {
+                guard += 1;
+                if guard > 2_000_000 {
+                    self.dbg = 6;
+                    return None;
+                }
+                let pick: u32;
+                if self.par_stamp[cur as usize] == xid {
+                    pick = self.par[cur as usize];
+                } else {
+                    let k = inst.neigh(cur, &mut nb, &mut wb);
+                    let mut picks: [u32; 6] = [0; 6];
+                    let mut np = 0usize;
+                    let dcur = self.pdist[cur as usize];
+                    let vcost_cur = if CHAIN {
+                        if chain_owner.expect("direct prices require ownership")[cur as usize] >= 0
+                        {
+                            pres_fac
+                        } else {
+                            0.0
+                        }
+                    } else if self.pvst[cur as usize] == ng {
+                        self.phv[cur as usize] + pres_fac * self.pcv[cur as usize] as f64
+                    } else {
+                        0.0
+                    };
+                    for i in 0..k {
+                        let u = nb[i];
+                        if self.pstamp[u as usize] != st {
+                            continue;
+                        }
+                        let ek = ekey(u, cur);
+                        let he = if CHAIN {
+                            0.0
+                        } else {
+                            self.phe.get(&ek).copied().unwrap_or(0.0)
+                        };
+                        let pe = if CHAIN {
+                            0.0
+                        } else {
+                            self.pce.get(&ek).copied().unwrap_or(0) as f64
+                        };
+                        let ec = (wb[i] as f64) * (1.0 + he + pres_fac * pe);
+                        let vc = if CHAIN && ENTRY {
+                            let owners = chain_owner.unwrap();
+                            if owners[cur as usize] >= 0
+                                && owners[cur as usize] == owners[u as usize]
+                            {
+                                0.0
+                            } else {
+                                vcost_cur
+                            }
+                        } else if !CHAIN
+                            && !self.entry_owner.is_empty()
+                            && self.entry_owner[cur as usize] >= 0
+                            && self.entry_owner[cur as usize] == self.entry_owner[u as usize]
+                        {
+                            0.0
+                        } else {
+                            vcost_cur
+                        };
+                        if self.pdist[u as usize] + ec + vcong * vc == dcur {
+                            picks[np] = u;
+                            np += 1;
+                        }
+                    }
+                    if np == 0 {
+                        self.dbg = 7;
+                        return None;
+                    }
+                    pick = picks[self.rng.below(np as u64) as usize];
+                    self.par[cur as usize] = pick;
+                    self.par_stamp[cur as usize] = xid;
+                }
+                let ce = canon(pick, cur);
+                let key = (ce.0 as u64) << 32 | ce.1 as u64;
+                if self.eset.insert(key) {
+                    edges.push(ce);
+                }
+                verts.push(pick);
+                cur = pick;
+            }
+        }
+        verts.sort_unstable();
+        verts.dedup();
+        if edges.len() + 1 != verts.len() {
+            self.dbg = 8;
+            self.vdbg = verts.len() as u32;
+            self.edbg = edges.len() as u32;
+            return None;
+        }
+        Some((verts, edges))
+    }
+}
+
+#[inline(always)]
+fn ekey(a: u32, b: u32) -> u64 {
+    let (x, y) = if a < b { (a, b) } else { (b, a) };
+    ((x as u64) << 32) | y as u64
+}
+
+// Evaluate the physical tree objective, independent of negotiated edge prices.
+fn physical_sink_delays(inst: &Inst, nid: usize, edges: &[(u32, u32)]) -> Vec<u32> {
+    let mut adj = std::collections::HashMap::<u32, Vec<u32>>::new();
+    for &(a, b) in edges {
+        adj.entry(a).or_default().push(b);
+        adj.entry(b).or_default().push(a);
+    }
+    let mut dist = std::collections::HashMap::<u32, u64>::new();
+    let root = inst.nets[nid].driver;
+    dist.insert(root, 0);
+    let mut stack = vec![root];
+    while let Some(v) = stack.pop() {
+        let d = dist[&v];
+        if let Some(nb) = adj.get(&v) {
+            for &u in nb {
+                if !dist.contains_key(&u) {
+                    dist.insert(u, d + edge_w(inst, v, u).expect("tree edge") as u64);
+                    stack.push(u);
+                }
+            }
+        }
+    }
+    inst.nets[nid]
+        .sinks
+        .iter()
+        .map(|s| u32::try_from(dist[s]).expect("sink delay exceeds u32"))
+        .collect()
+}
+fn physical_tree_delay(inst: &Inst, nid: usize, edges: &[(u32, u32)]) -> u64 {
+    physical_sink_delays(inst, nid, edges)
+        .iter()
+        .map(|&d| d as u64)
+        .sum()
+}
+
+// ---------------------------------------------------------------- moves ----
+fn commit(owner: &mut [i32], nid: usize, verts: &[u32]) {
+    for &v in verts {
+        owner[v as usize] = nid as i32;
+    }
+}
+
+fn uncommit(owner: &mut [i32], verts: &[u32]) {
+    for &v in verts {
+        owner[v as usize] = -1;
+    }
+}
+
+#[derive(Clone)]
+struct Saved {
+    nid: usize,
+    verts: Vec<u32>,
+    edges: Vec<(u32, u32)>,
+    delay: u64,
+}
+
+#[derive(Default)]
+struct ChainPolishStats {
+    complete_chains: u64,
+    exact_queries: u64,
+    changed_chains: u64,
+    recovered_acceptances: u64,
+    physical_savings: u64,
+    accepted_strict_gains: u64,
+}
+
+fn polish_chain_proposals(
+    inst: &Inst,
+    owner: &mut [i32],
+    ws: &mut Scratch,
+    saved: &[Saved],
+    proposals: &mut [(Vec<u32>, Vec<(u32, u32)>, u64)],
+    stats: &mut ChainPolishStats,
+) -> bool {
+    let mut changed = false;
+    for _ in 0..2 {
+        let mut sweep_changed = false;
+        for i in 0..saved.len() {
+            let nid = saved[i].nid;
+            let old_delay = proposals[i].2;
+            let old_verts = std::mem::take(&mut proposals[i].0);
+            uncommit(owner, &old_verts);
+            let cutoff = old_delay.min(u32::MAX as u64) as u32;
+            ws.dijkstra(
+                inst,
+                owner,
+                inst.nets[nid].driver,
+                nid as i32,
+                false,
+                cutoff,
+            );
+            stats.exact_queries += 1;
+            let result = ws.extract(inst, &inst.nets[nid]);
+            if let Some((verts, edges, delay)) = result {
+                if delay <= old_delay && verts.iter().all(|&v| owner[v as usize] < 0) {
+                    let geometry_changed = verts != old_verts || edges != proposals[i].1;
+                    commit(owner, nid, &verts);
+                    proposals[i] = (verts, edges, delay);
+                    if geometry_changed {
+                        changed = true;
+                    }
+                    if delay < old_delay {
+                        stats.physical_savings += old_delay - delay;
+                        sweep_changed = true;
+                    }
+                    continue;
+                }
+            }
+            // No nonworsening feasible extraction: restore the exact proposal
+            // geometry and keep it hard for the next net.
+            commit(owner, nid, &old_verts);
+            proposals[i].0 = old_verts;
+        }
+        if !sweep_changed {
+            break;
+        }
+    }
+    changed
+}
+
+fn restore_chain(
+    owner: &mut [i32],
+    saved: &[Saved],
+    proposals: &[(Vec<u32>, Vec<(u32, u32)>, u64)],
+) {
+    for (verts, _, _) in proposals {
+        uncommit(owner, verts);
+    }
+    for s in saved {
+        commit(owner, s.nid, &s.verts);
+    }
+}
+
+fn group_move(
+    inst: &Inst,
+    sol: &mut Solution,
+    owner: &mut [i32],
+    ws: &mut Scratch,
+    group: &[usize],
+    passes: u32,
+    thr: i64,
+    compact: bool,
+    ub: u32,
+    rescue: bool,
+) -> Option<(i64, bool)> {
+    if group.len() < 2 {
+        return None;
+    }
+    let mut saved: Vec<Saved> = Vec::with_capacity(group.len());
+    let mut cur_verts: Vec<Vec<u32>> = Vec::with_capacity(group.len());
+    for &nid in group {
+        let sv = Saved {
+            nid,
+            verts: sol.verts[nid].clone(),
+            edges: sol.edges[nid].clone(),
+            delay: sol.delay[nid],
+        };
+        uncommit(owner, &sv.verts);
+        saved.push(sv);
+        cur_verts.push(Vec::new());
+    }
+    let mut new_delays: Vec<u64> = vec![0; group.len()];
+    let mut new_edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); group.len()];
+    let mut order: Vec<usize> = (0..group.len()).collect();
+    let mut ok = true;
+    for _pass in 0..passes.max(1) {
+        for i in (1..order.len()).rev() {
+            let j = if rescue && _pass == 0 {
+                1 + ws.rng.below(i as u64) as usize
+            } else {
+                ws.rng.below((i + 1) as u64) as usize
+            };
+            order.swap(i, j);
+        }
+        for &gi in &order {
+            if rescue && _pass == 0 && gi != 0 && !cur_verts[gi].is_empty() {
+                continue;
+            }
+            let nid = group[gi];
+            uncommit(owner, &cur_verts[gi]);
+            let cut = saved[gi]
+                .delay
+                .saturating_add(ub as u64)
+                .min(u32::MAX as u64) as u32;
+            ws.dijkstra(inst, owner, inst.nets[nid].driver, nid as i32, false, cut);
+            match ws.extract(inst, &inst.nets[nid]) {
+                Some((v, e, d)) => {
+                    commit(owner, nid, &v);
+                    cur_verts[gi] = v;
+                    new_delays[gi] = d;
+                    new_edges[gi] = e;
+                    if rescue && _pass == 0 && gi == 0 {
+                        // Keep every untouched route that still fits after the
+                        // delayed seed moves. Only its actual displaced nets
+                        // need repair; unrelated neutral geometry is retained.
+                        for j in 1..saved.len() {
+                            if saved[j].verts.iter().all(|&v| owner[v as usize] < 0) {
+                                commit(owner, saved[j].nid, &saved[j].verts);
+                                cur_verts[j] = saved[j].verts.clone();
+                                new_edges[j] = saved[j].edges.clone();
+                                new_delays[j] = saved[j].delay;
+                            }
+                        }
+                    }
+                }
+                None => {
+                    dbg_note(ws, gi, group.len(), "group");
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            break;
+        }
+    }
+    if ok {
+        let old_sum: i64 = saved.iter().map(|s| s.delay as i64).sum();
+        let new_sum: i64 = new_delays.iter().map(|&d| d as i64).sum();
+        let delta = new_sum - old_sum;
+        let old_v: i64 = saved.iter().map(|s| s.verts.len() as i64).sum();
+        let new_v: i64 = cur_verts.iter().map(|v| v.len() as i64).sum();
+        let vdelta = new_v - old_v;
+        if delta <= thr && (delta != 0 || !compact || vdelta <= 0) {
+            for (gi, s) in saved.iter().enumerate() {
+                sol.verts[s.nid] = std::mem::take(&mut cur_verts[gi]);
+                sol.edges[s.nid] = std::mem::take(&mut new_edges[gi]);
+                sol.delay[s.nid] = new_delays[gi];
+            }
+            sol.total = (sol.total as i64 + delta) as u64;
+            sol.vcount = (sol.vcount as i64 + vdelta) as u64;
+            Some((delta, true))
+        } else {
+            for gi in 0..saved.len() {
+                uncommit(owner, &cur_verts[gi]);
+            }
+            for s in saved.iter() {
+                commit(owner, s.nid, &s.verts);
+                sol.verts[s.nid] = s.verts.clone();
+                sol.edges[s.nid] = s.edges.clone();
+                sol.delay[s.nid] = s.delay;
+            }
+            Some((delta, false))
+        }
+    } else {
+        for gi in 0..saved.len() {
+            uncommit(owner, &cur_verts[gi]);
+        }
+        for s in saved.iter() {
+            commit(owner, s.nid, &s.verts);
+        }
+        None
+    }
+}
+
+/// Warm negotiated-congestion group move (PathFinder-style). Rip the group,
+/// run penalized rounds where members may transiently overuse resources
+/// (present + history costs, escalating pres_fac), then legalize with an
+/// exact strict reroute pass. This mirrors the mechanism PR#5 credits for
+/// its hard-tier improvements, group-scoped and warm-started from the
+/// incumbent. Returns (delta, accepted); None if inapplicable/aborted.
+#[allow(clippy::too_many_arguments)]
+fn neg_group_move(
+    inst: &Inst,
+    sol: &mut Solution,
+    owner: &mut [i32],
+    ing: &mut [bool],
+    ws: &mut Scratch,
+    group: &[usize],
+    rounds: u32,
+    pres_fac0: f64,
+    pres_mult: f64,
+    hist_fac: f64,
+    vcong: f64,
+    thr: i64,
+    compact: bool,
+    ub: u32,
+) -> Option<(i64, bool)> {
+    ws.entry_owner.clear();
+    if group.len() < 2 {
+        return None;
+    }
+    let kg = group.len();
+    let mut saved: Vec<Saved> = Vec::with_capacity(kg);
+    for &nid in group {
+        let sv = Saved {
+            nid,
+            verts: sol.verts[nid].clone(),
+            edges: sol.edges[nid].clone(),
+            delay: sol.delay[nid],
+        };
+        uncommit(owner, &sv.verts);
+        saved.push(sv);
+    }
+    for &nid in group {
+        ing[nid] = true;
+    }
+    ws.ncur += 1;
+    let ng = ws.ncur;
+    ws.pce.clear();
+    ws.phe.clear();
+
+    let mut cur_verts: Vec<Vec<u32>> = vec![Vec::new(); kg];
+    let mut cur_edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); kg];
+    let mut placed: Vec<bool> = vec![false; kg];
+    let mut failed = false;
+
+    'rounds: for r in 0..rounds.max(1) {
+        let pres_fac = pres_fac0 * pres_mult.powi(r as i32);
+        let mut order: Vec<usize> = (0..kg).collect();
+        for i in (1..order.len()).rev() {
+            let j = ws.rng.below((i + 1) as u64) as usize;
+            order.swap(i, j);
+        }
+        for &gi in &order {
+            if placed[gi] {
+                for &v in &cur_verts[gi] {
+                    if ws.pvst[v as usize] == ng {
+                        ws.pcv[v as usize] -= 1;
+                    }
+                    owner[v as usize] = -1;
+                }
+                for &(a, b) in &cur_edges[gi] {
+                    if let Some(c) = ws.pce.get_mut(&ekey(a, b)) {
+                        *c = c.saturating_sub(1);
+                    }
+                }
+            }
+            let nid = group[gi];
+            ws.pdijkstra(
+                inst,
+                owner,
+                ing,
+                nid as i32,
+                inst.nets[nid].driver,
+                pres_fac,
+                vcong,
+            );
+            match ws.extract_pen(inst, &inst.nets[nid], pres_fac, vcong) {
+                Some((v, e)) => {
+                    for &vv in &v {
+                        if ws.pvst[vv as usize] != ng {
+                            ws.pvst[vv as usize] = ng;
+                            ws.pcv[vv as usize] = 0;
+                            ws.phv[vv as usize] = 0.0;
+                        }
+                        ws.pcv[vv as usize] += 1;
+                        owner[vv as usize] = nid as i32;
+                    }
+                    for &(a, b) in &e {
+                        *ws.pce.entry(ekey(a, b)).or_insert(0) += 1;
+                    }
+                    cur_verts[gi] = v;
+                    cur_edges[gi] = e;
+                    placed[gi] = true;
+                }
+                None => {
+                    dbg_note(ws, gi, kg, "neg");
+                    failed = true;
+                    break 'rounds;
+                }
+            }
+        }
+        // overuse check + history update for the next round
+        let mut over = false;
+        for gi in 0..kg {
+            for &v in &cur_verts[gi] {
+                if ws.pvst[v as usize] == ng && ws.pcv[v as usize] >= 2 {
+                    over = true;
+                    ws.phv[v as usize] += hist_fac * (ws.pcv[v as usize] - 1) as f64;
+                }
+            }
+            for &(a, b) in &cur_edges[gi] {
+                if let Some(&c) = ws.pce.get(&ekey(a, b)) {
+                    if c >= 2 {
+                        over = true;
+                        *ws.phe.entry(ekey(a, b)).or_insert(0.0) += hist_fac * (c - 1) as f64;
+                    }
+                }
+            }
+        }
+        if !over {
+            break;
+        }
+    }
+
+    for &nid in group {
+        ing[nid] = false;
+    }
+    ws.pce.clear();
+    ws.phe.clear();
+
+    // Preserve a conflict-free negotiated tree instead of always discarding
+    // its geometry before the strict reroute. Capacity is per vertex.
+    if inst.retain_negotiated
+        && !failed
+        && placed.iter().all(|&p| p)
+        && cur_verts
+            .iter()
+            .all(|vs| vs.iter().all(|&v| ws.pcv[v as usize] == 1))
+    {
+        let new_delays: Vec<u64> = group
+            .iter()
+            .enumerate()
+            .map(|(gi, &nid)| physical_tree_delay(inst, nid, &cur_edges[gi]))
+            .collect();
+        let old_sum: u64 = saved.iter().map(|s| s.delay).sum();
+        let new_sum: u64 = new_delays.iter().sum();
+        let old_v: usize = saved.iter().map(|s| s.verts.len()).sum();
+        let new_v: usize = cur_verts.iter().map(|v| v.len()).sum();
+        let delta = new_sum as i64 - old_sum as i64;
+        if delta <= thr && (delta != 0 || !compact || new_v <= old_v) {
+            for (gi, &nid) in group.iter().enumerate() {
+                sol.verts[nid] = std::mem::take(&mut cur_verts[gi]);
+                sol.edges[nid] = std::mem::take(&mut cur_edges[gi]);
+                sol.delay[nid] = new_delays[gi];
+                // During soft overlap, another member's rip-up can clear this
+                // vertex's owner even after its eventual sole owner was routed.
+                // Rebuild group ownership before returning a retained state.
+                commit(owner, nid, &sol.verts[nid]);
+            }
+            sol.total = (sol.total as i64 + delta) as u64;
+            sol.vcount = (sol.vcount as i64 + new_v as i64 - old_v as i64) as u64;
+            return Some((delta, true));
+        }
+    }
+
+    if failed {
+        for gi in 0..kg {
+            for &v in &cur_verts[gi] {
+                owner[v as usize] = -1;
+            }
+        }
+        for s in saved.iter() {
+            commit(owner, s.nid, &s.verts);
+        }
+        return None;
+    }
+
+    // Blanket-free every member's negotiated tree, then exact strict polish.
+    // Members may wall each other while legalizing, so retry with reshuffled
+    // orders before giving up on the trial.
+    let mut new_verts: Vec<Vec<u32>> = vec![Vec::new(); kg];
+    let mut new_edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); kg];
+    let mut new_delays: Vec<u64> = vec![0; kg];
+    let mut ok = false;
+    for _attempt in 0..3 {
+        for gi in 0..kg {
+            if placed[gi] {
+                for &v in &cur_verts[gi] {
+                    owner[v as usize] = -1;
+                }
+            }
+        }
+        for gi in 0..kg {
+            for &v in &new_verts[gi] {
+                owner[v as usize] = -1;
+            }
+            new_verts[gi].clear();
+            new_edges[gi].clear();
+        }
+        let mut order: Vec<usize> = (0..kg).collect();
+        for i in (1..order.len()).rev() {
+            let j = ws.rng.below((i + 1) as u64) as usize;
+            order.swap(i, j);
+        }
+        ok = true;
+        for &gi in &order {
+            let nid = group[gi];
+            let cut = saved[gi]
+                .delay
+                .saturating_add(ub as u64)
+                .min(u32::MAX as u64) as u32;
+            ws.dijkstra(inst, owner, inst.nets[nid].driver, nid as i32, false, cut);
+            match ws.extract(inst, &inst.nets[nid]) {
+                Some((v, e, d)) => {
+                    commit(owner, nid, &v);
+                    new_verts[gi] = v;
+                    new_edges[gi] = e;
+                    new_delays[gi] = d;
+                }
+                None => {
+                    dbg_note(ws, gi, kg, "polish");
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok {
+            break;
+        }
+    }
+    if !ok {
+        for gi in 0..kg {
+            for &v in &new_verts[gi] {
+                owner[v as usize] = -1;
+            }
+        }
+        for s in saved.iter() {
+            commit(owner, s.nid, &s.verts);
+        }
+        return None;
+    }
+    let old_sum: i64 = saved.iter().map(|s| s.delay as i64).sum();
+    let new_sum: i64 = new_delays.iter().map(|&d| d as i64).sum();
+    let delta = new_sum - old_sum;
+    let old_v: i64 = saved.iter().map(|s| s.verts.len() as i64).sum();
+    let new_v: i64 = new_verts.iter().map(|v| v.len() as i64).sum();
+    let vdelta = new_v - old_v;
+    if delta <= thr && (delta != 0 || !compact || vdelta <= 0) {
+        for (gi, s) in saved.iter().enumerate() {
+            sol.verts[s.nid] = std::mem::take(&mut new_verts[gi]);
+            sol.edges[s.nid] = std::mem::take(&mut new_edges[gi]);
+            sol.delay[s.nid] = new_delays[gi];
+        }
+        sol.total = (sol.total as i64 + delta) as u64;
+        sol.vcount = (sol.vcount as i64 + vdelta) as u64;
+        Some((delta, true))
+    } else {
+        for gi in 0..kg {
+            uncommit(owner, &new_verts[gi]);
+        }
+        for s in saved.iter() {
+            commit(owner, s.nid, &s.verts);
+            sol.verts[s.nid] = s.verts.clone();
+            sol.edges[s.nid] = s.edges.clone();
+            sol.delay[s.nid] = s.delay;
+        }
+        Some((delta, false))
+    }
+}
+
+/// Force one non-pin vertex out of a net's route. Unlike an ordinary neutral
+/// move, this can create a small physical detour and release a bottleneck.
+/// Other nets stay fixed; accept only within the caller's total-walk budget.
+fn detour_move(
+    inst: &Inst,
+    sol: &mut Solution,
+    owner: &mut [i32],
+    ws: &mut Scratch,
+    nid: usize,
+    threshold: i64,
+) {
+    if sol.verts[nid].is_empty() {
+        return;
+    }
+    let start = ws.rng.below(sol.verts[nid].len() as u64) as usize;
+    let blocked = (0..sol.verts[nid].len())
+        .map(|i| sol.verts[nid][(start + i) % sol.verts[nid].len()])
+        .find(|&v| inst.pin_owner[v as usize] < 0);
+    let Some(blocked) = blocked else {
+        return;
+    };
+    let old_delay = sol.delay[nid];
+    let old = std::mem::take(&mut sol.verts[nid]);
+    uncommit(owner, &old);
+    owner[blocked as usize] = inst.nets.len() as i32;
+    // The old per-sink bounds need not remain feasible after excluding this
+    // vertex. Use a total-cost cutoff, and check the extracted physical sum.
+    let cut = old_delay
+        .saturating_add(threshold.max(0) as u64)
+        .min(u32::MAX as u64) as u32;
+    ws.dijkstra(inst, owner, inst.nets[nid].driver, nid as i32, false, cut);
+    let result = ws.extract(inst, &inst.nets[nid]);
+    owner[blocked as usize] = -1;
+    if let Some((verts, edges, delay)) = result {
+        if delay as i64 - old_delay as i64 <= threshold {
+            assert!(!verts.contains(&blocked));
+            commit(owner, nid, &verts);
+            sol.total = (sol.total as i64 + delay as i64 - old_delay as i64) as u64;
+            sol.vcount = (sol.vcount as i64 + verts.len() as i64 - old.len() as i64) as u64;
+            sol.delay[nid] = delay;
+            sol.verts[nid] = verts;
+            sol.edges[nid] = edges;
+            return;
+        }
+    }
+    commit(owner, nid, &old);
+    sol.verts[nid] = old;
+}
+
+/// Route a seed through softly priced incumbent resources, then recursively
+/// repair the actual displaced nets. Already repaired trees remain hard
+/// obstacles. All edits are transactional until the complete chain is legal.
+fn chain_move(
+    inst: &Inst,
+    sol: &mut Solution,
+    owner: &mut [i32],
+    ws: &mut Scratch,
+    seed: usize,
+    cap: usize,
+    threshold: i64,
+    entry_price: bool,
+    direct_price: bool,
+    polish: bool,
+    polish_stats: &mut ChainPolishStats,
+) -> Option<i64> {
+    let nn = inst.nets.len();
+    let mut saved = vec![Saved {
+        nid: seed,
+        verts: sol.verts[seed].clone(),
+        edges: sol.edges[seed].clone(),
+        delay: sol.delay[seed],
+    }];
+    let mut member = vec![false; nn];
+    member[seed] = true;
+    let mut locked = vec![false; nn];
+    let mut soft = vec![true; nn];
+    let mut proposals: Vec<(Vec<u32>, Vec<(u32, u32)>, u64)> = Vec::new();
+    uncommit(owner, &saved[0].verts);
+    let price = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0][ws.rng.below(6) as usize];
+    let mut failed = false;
+    let mut cursor = 0;
+    while cursor < saved.len() {
+        let nid = saved[cursor].nid;
+        for n in 0..nn {
+            soft[n] = !locked[n] && (member[n] || saved.len() < cap);
+        }
+        ws.ncur += 1;
+        ws.pce.clear();
+        ws.phe.clear();
+        // Charge each transition into an occupied net, rather than every
+        // occupied vertex, so long contiguous blockers are not over-penalized.
+        // Re-entering a net is charged again; this is not a distinct-net cost.
+        ws.entry_owner.clear();
+        // Chain prices are a pure function of the existing ownership map.
+        // Read them on demand instead of touching three arrays over the whole
+        // grid before every (usually local) shortest-path search.
+        ws.direct_chain_prices = if direct_price {
+            Some(entry_price)
+        } else {
+            None
+        };
+        if !direct_price {
+            if entry_price {
+                ws.entry_owner.extend_from_slice(owner);
+            }
+            for v in 0..inst.n as usize {
+                if owner[v] >= 0 {
+                    ws.pvst[v] = ws.ncur;
+                    ws.pcv[v] = 1;
+                    ws.phv[v] = 0.0;
+                }
+            }
+        }
+        ws.pdijkstra(
+            inst,
+            owner,
+            &soft,
+            nid as i32,
+            inst.nets[nid].driver,
+            price,
+            1.0,
+        );
+        let extracted = ws.extract_pen_with_owner(inst, &inst.nets[nid], price, 1.0, Some(owner));
+        ws.direct_chain_prices = None;
+        let Some((verts, edges)) = extracted else {
+            failed = true;
+            break;
+        };
+        let mut displaced: Vec<usize> = verts
+            .iter()
+            .filter_map(|&v| {
+                let o = owner[v as usize];
+                if o >= 0 && o as usize != nid {
+                    Some(o as usize)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        displaced.sort_unstable();
+        displaced.dedup();
+        if displaced.iter().any(|&n| locked[n]) || saved.len() + displaced.len() > cap {
+            failed = true;
+            break;
+        }
+        for n in displaced {
+            assert!(!member[n]);
+            member[n] = true;
+            saved.push(Saved {
+                nid: n,
+                verts: sol.verts[n].clone(),
+                edges: sol.edges[n].clone(),
+                delay: sol.delay[n],
+            });
+            uncommit(owner, &sol.verts[n]);
+        }
+        assert!(verts.iter().all(|&v| owner[v as usize] < 0));
+        let delay = physical_tree_delay(inst, nid, &edges);
+        commit(owner, nid, &verts);
+        locked[nid] = true;
+        proposals.push((verts, edges, delay));
+        cursor += 1;
+    }
+    let old_sum: u64 = saved.iter().map(|s| s.delay).sum();
+    let proposed_sum: u64 = proposals.iter().map(|p| p.2).sum();
+    if !failed && cursor == saved.len() {
+        polish_stats.complete_chains += 1;
+        if polish {
+            // Keep every other proposal hard while replacing this one. Exact
+            // physical Dijkstra cannot increase its net's current delay; each
+            // accepted replacement therefore preserves legality and can only
+            // improve the aggregate physical objective.
+            if polish_chain_proposals(inst, owner, ws, &saved, &mut proposals, polish_stats) {
+                polish_stats.changed_chains += 1;
+            }
+        }
+    }
+    let new_sum: u64 = proposals.iter().map(|p| p.2).sum();
+    let delta = new_sum as i64 - old_sum as i64;
+    if !failed && cursor == saved.len() && delta <= threshold {
+        if polish && proposed_sum as i64 - old_sum as i64 > threshold {
+            polish_stats.recovered_acceptances += 1;
+        }
+        if polish && delta < 0 {
+            polish_stats.accepted_strict_gains += 1;
+        }
+        let old_count: usize = saved.iter().map(|s| s.verts.len()).sum();
+        let new_count: usize = proposals.iter().map(|p| p.0.len()).sum();
+        for (s, (verts, edges, delay)) in saved.iter().zip(proposals) {
+            sol.verts[s.nid] = verts;
+            sol.edges[s.nid] = edges;
+            sol.delay[s.nid] = delay;
+        }
+        sol.total = (sol.total as i64 + delta) as u64;
+        sol.vcount = (sol.vcount as i64 + new_count as i64 - old_count as i64) as u64;
+        Some(delta)
+    } else {
+        restore_chain(owner, &saved, &proposals);
+        None
+    }
+}
+
+fn single_move(
+    inst: &Inst,
+    sol: &mut Solution,
+    owner: &mut [i32],
+    ws: &mut Scratch,
+    nid: usize,
+    compact: bool,
+    ub: u32,
+) {
+    let old_delay = sol.delay[nid];
+    let old_verts = std::mem::take(&mut sol.verts[nid]);
+    let old_v = old_verts.len();
+    uncommit(owner, &old_verts);
+    let cut = old_delay.saturating_add(ub as u64).min(u32::MAX as u64) as u32;
+    if inst.budget_bound {
+        let budgets = physical_sink_delays(inst, nid, &sol.edges[nid]);
+        ws.dijkstra_bounded(inst, owner, nid, &budgets, false);
+    } else {
+        ws.dijkstra(inst, owner, inst.nets[nid].driver, nid as i32, false, cut);
+    }
+    match ws.extract(inst, &inst.nets[nid]) {
+        Some((v, e, d)) => {
+            if compact && d == old_delay && v.len() > old_v {
+                commit(owner, nid, &old_verts);
+                sol.verts[nid] = old_verts;
+            } else {
+                commit(owner, nid, &v);
+                sol.delay[nid] = d;
+                sol.total = (sol.total as i64 + d as i64 - old_delay as i64) as u64;
+                sol.vcount = (sol.vcount as i64 + v.len() as i64 - old_v as i64) as u64;
+                sol.verts[nid] = v;
+                sol.edges[nid] = e;
+            }
+        }
+        None => {
+            commit(owner, nid, &old_verts);
+            sol.verts[nid] = old_verts;
+        }
+    }
+}
+
+/// Group = seed + nets occupying a Chebyshev-box region around a random
+/// vertex of the seed's route, capped at k.
+fn region_group(
+    inst: &Inst,
+    sol: &Solution,
+    owner: &[i32],
+    ws: &mut Scratch,
+    seed: usize,
+    r: u32,
+    k: usize,
+) -> Vec<usize> {
+    if sol.verts[seed].is_empty() || k < 2 {
+        return Vec::new();
+    }
+    let anchor = sol.verts[seed][ws.rng.below(sol.verts[seed].len() as u64) as usize];
+    let (ax, ay, _) = inst.xyz(anchor);
+    let x0 = ax.saturating_sub(r);
+    let x1 = (ax + r).min(inst.w - 1);
+    let y0 = ay.saturating_sub(r);
+    let y1 = (ay + r).min(inst.h - 1);
+    ws.gcur += 1;
+    let gc = ws.gcur;
+    let mut members: Vec<usize> = vec![seed];
+    for z in 0..inst.l {
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                let v = z * inst.wh + y * inst.w + x;
+                let o = owner[v as usize];
+                if o >= 0 && o as usize != seed && ws.gstamp[o as usize] != gc {
+                    ws.gstamp[o as usize] = gc;
+                    members.push(o as usize);
+                }
+            }
+        }
+    }
+    if members.len() < 2 {
+        return Vec::new();
+    }
+    if members.len() > k {
+        let mut counts: Vec<(usize, u32)> = Vec::with_capacity(members.len() - 1);
+        let mut cnt: std::collections::HashMap<usize, u32> = std::collections::HashMap::new();
+        for z in 0..inst.l {
+            for y in y0..=y1 {
+                for x in x0..=x1 {
+                    let v = z * inst.wh + y * inst.w + x;
+                    let o = owner[v as usize];
+                    if o >= 0 && o as usize != seed && ws.gstamp[o as usize] == gc {
+                        *cnt.entry(o as usize).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+        for (nid, c) in cnt {
+            counts.push((nid, c));
+        }
+        counts.sort_unstable_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let take = (k - 1).min(counts.len());
+        let mut out: Vec<usize> = vec![seed];
+        for &(nid, _) in counts.iter().take(take) {
+            out.push(nid);
+        }
+        return out;
+    }
+    members
+}
+
+/// Group = seed + owners of vertices on the seed's ideal (pins-only) tree.
+fn blocker_group(
+    inst: &Inst,
+    sol: &Solution,
+    owner: &[i32],
+    ws: &mut Scratch,
+    seed: usize,
+    k: usize,
+) -> Vec<usize> {
+    if k < 2 {
+        return Vec::new();
+    }
+    ws.dijkstra(
+        inst,
+        owner,
+        inst.nets[seed].driver,
+        seed as i32,
+        true,
+        u32::MAX,
+    );
+    let net = &inst.nets[seed];
+    let ideal = match ws.extract(inst, net) {
+        Some((v, _e, _d)) => v,
+        None => return Vec::new(),
+    };
+    ws.gcur += 1;
+    let gc = ws.gcur;
+    let mut members: Vec<usize> = vec![seed];
+    for &v in &ideal {
+        let o = owner[v as usize];
+        if o >= 0 && o as usize != seed && ws.gstamp[o as usize] != gc {
+            ws.gstamp[o as usize] = gc;
+            members.push(o as usize);
+        }
+    }
+    if members.len() < 2 {
+        return Vec::new();
+    }
+    if members.len() > k {
+        let mut tail: Vec<usize> = members[1..].to_vec();
+        for i in (1..tail.len()).rev() {
+            let j = ws.rng.below((i + 1) as u64) as usize;
+            tail.swap(i, j);
+        }
+        let mut out = vec![seed];
+        out.extend_from_slice(&tail[..k - 1]);
+        return out;
+    }
+    members
+}
+
+// ----------------------------------------------------------------- main ----
+/// Strict coordinate descent: do not discard an incumbent's neutral geometry.
+/// A completed pass without changes certifies only the single-net fixed point.
+fn strict_polish(inst: &Inst, sol: &mut Solution, seed: u64) {
+    let mut owner = vec![-1i32; inst.n as usize];
+    for nid in 0..inst.nets.len() {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut ws = Scratch::new(inst.n, inst.nets.len(), seed);
+    let mut passes = 0;
+    let start = sol.total;
+    loop {
+        passes += 1;
+        let before = sol.total;
+        for nid in 0..inst.nets.len() {
+            uncommit(&mut owner, &sol.verts[nid]);
+            if inst.budget_bound {
+                let budgets = physical_sink_delays(inst, nid, &sol.edges[nid]);
+                ws.dijkstra_bounded(inst, &owner, nid, &budgets, false);
+            } else {
+                ws.dijkstra(
+                    inst,
+                    &owner,
+                    inst.nets[nid].driver,
+                    nid as i32,
+                    false,
+                    u32::MAX,
+                );
+            }
+            if let Some((v, e, d)) = ws.extract(inst, &inst.nets[nid]) {
+                if d < sol.delay[nid] {
+                    sol.total -= sol.delay[nid] - d;
+                    sol.vcount = sol.vcount - sol.verts[nid].len() as u64 + v.len() as u64;
+                    sol.delay[nid] = d;
+                    sol.verts[nid] = v;
+                    sol.edges[nid] = e;
+                }
+            }
+            commit(&mut owner, nid, &sol.verts[nid]);
+        }
+        if sol.total == before {
+            break;
+        }
+    }
+    println!(
+        "POLISH passes={} before={} after={} gain={}",
+        passes,
+        start,
+        sol.total,
+        start - sol.total
+    );
+}
+
+fn stable_polish(inst: &Inst, sol: &mut Solution, limit: usize) {
+    stable_polish_order(inst, sol, limit, false, false);
+}
+fn stable_polish_order(
+    inst: &Inst,
+    sol: &mut Solution,
+    limit: usize,
+    reverse_vertices: bool,
+    reverse_nets: bool,
+) {
+    let mut owner = vec![-1; inst.n as usize];
+    for nid in 0..inst.nets.len() {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut ws = Scratch::new(inst.n, inst.nets.len(), 0);
+    let before = sol.total;
+    let mut passes = 0;
+    for _ in 0..limit {
+        passes += 1;
+        let mut changed = false;
+        let previous = sol.total;
+        for index in 0..inst.nets.len() {
+            let nid = if reverse_nets {
+                inst.nets.len() - 1 - index
+            } else {
+                index
+            };
+            uncommit(&mut owner, &sol.verts[nid]);
+            ws.dijkstra(
+                inst,
+                &owner,
+                inst.nets[nid].driver,
+                nid as i32,
+                false,
+                u32::MAX,
+            );
+            if let Some((vertices, edges, delay)) =
+                ws.extract_stable_order(inst, &inst.nets[nid], reverse_vertices)
+            {
+                // Equal-delay/equal-footprint moves can release resources for
+                // a later net. Bound the number of sweeps rather than stopping
+                // after a pass with no immediate delay gain.
+                if (delay, vertices.len()) <= (sol.delay[nid], sol.verts[nid].len()) {
+                    assert!(vertices.iter().all(|&v| owner[v as usize] < 0));
+                    changed |= edges != sol.edges[nid];
+                    sol.total = sol.total - sol.delay[nid] + delay;
+                    sol.vcount = sol.vcount - sol.verts[nid].len() as u64 + vertices.len() as u64;
+                    sol.delay[nid] = delay;
+                    sol.verts[nid] = vertices;
+                    sol.edges[nid] = edges;
+                }
+            }
+            commit(&mut owner, nid, &sol.verts[nid]);
+        }
+        assert!(sol.total <= previous);
+        if inst.check_state {
+            assert_consistent_state(inst, sol, &owner);
+        }
+        // Stable extraction has no random/history state. An unchanged entire
+        // geometry is a fixed point for this order, including neutral moves.
+        if !changed {
+            break;
+        }
+    }
+    println!(
+        "STABLE_POLISH passes={} before={} after={} gain={}",
+        passes,
+        before,
+        sol.total,
+        before - sol.total
+    );
+}
+
+const OWNER_SET_GROUP_SLOTS: usize = 16;
+const OWNER_SET_GROUP_MEMBER_CAP: usize = 4;
+const OWNER_SET_LABELS_PER_VERTEX: usize = 8;
+const OWNER_SET_LABEL_LIMIT: usize = 50_000;
+const OWNER_SET_EXPANSION_LIMIT: usize = 50_000;
+const OWNER_SET_CBS_CALL_LIMIT: usize = 16;
+
+#[derive(Default)]
+struct OwnerSetSearchStats {
+    labels_pushed: usize,
+    expansions: usize,
+    join_probes: usize,
+    truncated: bool,
+    // Each item is the best walk cost and exact union of owner IDs found by
+    // joining one forward and one reverse product-graph label.
+    sink_labels: Vec<(u64, Vec<usize>)>,
+}
+
+type OwnerStateKey = (u32, Vec<usize>);
+type OwnerQueue = BinaryHeap<Reverse<(u64, u64, u32, Vec<usize>)>>;
+
+struct OwnerLabelSide {
+    best: std::collections::HashMap<OwnerStateKey, u64>,
+    by_vertex: std::collections::HashMap<u32, Vec<Vec<usize>>>,
+    per_vertex: Vec<usize>,
+    queue: OwnerQueue,
+    labels_pushed: usize,
+    expansions: usize,
+    label_cap: usize,
+    expansion_cap: usize,
+    disabled: bool,
+}
+
+impl OwnerLabelSide {
+    fn new(n: u32, label_cap: usize, expansion_cap: usize) -> Self {
+        Self {
+            best: std::collections::HashMap::new(),
+            by_vertex: std::collections::HashMap::new(),
+            per_vertex: vec![0; n as usize],
+            queue: BinaryHeap::new(),
+            labels_pushed: 0,
+            expansions: 0,
+            label_cap,
+            expansion_cap,
+            disabled: false,
+        }
+    }
+
+    fn seed(&mut self, vertex: u32, h: u32) {
+        let owners = Vec::new();
+        self.best.insert((vertex, owners.clone()), 0);
+        self.by_vertex.entry(vertex).or_default().push(owners.clone());
+        self.per_vertex[vertex as usize] = 1;
+        self.queue.push(Reverse((h as u64, 0, vertex, owners)));
+        self.labels_pushed = 1;
+    }
+}
+
+fn owner_side_has_live_label(side: &mut OwnerLabelSide) -> bool {
+    loop {
+        let Some(Reverse((_, distance, vertex, ref owners))) = side.queue.peek() else {
+            return false;
+        };
+        if side.best.get(&(*vertex, owners.clone())).copied() == Some(*distance) {
+            return true;
+        }
+        side.queue.pop();
+    }
+}
+
+/// Record compatible forward/reverse labels meeting at one physical vertex.
+/// A joined pair describes a root-to-sink walk; it is only a group nomination
+/// witness. Existing CBS reconstructs a complete tree and screens exact delay.
+fn owner_set_record_meetings(
+    stats: &mut OwnerSetSearchStats,
+    joined: &mut std::collections::HashMap<Vec<usize>, u64>,
+    vertex: u32,
+    distance: u64,
+    owners: &[usize],
+    opposite: &OwnerLabelSide,
+    max_owners: usize,
+    strict_limit: u32,
+) {
+    let Some(opposite_sets) = opposite.by_vertex.get(&vertex) else { return; };
+    for other_owners in opposite_sets {
+        stats.join_probes += 1;
+        let Some(&other_distance) = opposite.best.get(&(vertex, other_owners.clone())) else { continue; };
+        let total = distance.saturating_add(other_distance);
+        if total >= strict_limit as u64 {
+            continue;
+        }
+        let mut union = Vec::with_capacity(owners.len() + other_owners.len());
+        union.extend_from_slice(owners);
+        union.extend_from_slice(other_owners);
+        union.sort_unstable();
+        union.dedup();
+        if union.len() > max_owners {
+            continue;
+        }
+        joined.entry(union).and_modify(|old| *old = (*old).min(total)).or_insert(total);
+    }
+}
+
+/// Expand one exact owner-state side by one A* label. The same consistent
+/// obstacle-free physical lower bound is used in either direction; `Inst::neigh`
+/// has symmetric edge weights. A side stops only when its fixed half-budget or
+/// its frontier is exhausted. Every inserted state probes at most the eight
+/// opposite labels permitted at that vertex.
+fn owner_set_expand_side(
+    inst: &Inst,
+    owner: &[i32],
+    seed: usize,
+    goals: &[(u32, u32, u32)],
+    planar: u32,
+    side: &mut OwnerLabelSide,
+    opposite: &OwnerLabelSide,
+    stats: &mut OwnerSetSearchStats,
+    joined: &mut std::collections::HashMap<Vec<usize>, u64>,
+    max_owners: usize,
+    strict_limit: u32,
+    per_vertex_cap: usize,
+) {
+    loop {
+        let Some(Reverse((_f, distance, vertex, owners))) = side.queue.pop() else {
+            side.disabled = true;
+            return;
+        };
+        if side.best.get(&(vertex, owners.clone())).copied() != Some(distance) {
+            continue;
+        }
+        if side.expansions >= side.expansion_cap {
+            stats.truncated = true;
+            side.disabled = true;
+            side.queue.push(Reverse((
+                distance + goal_bound(inst, goals, vertex, planar) as u64,
+                distance,
+                vertex,
+                owners,
+            )));
+            return;
+        }
+        side.expansions += 1;
+        stats.expansions += 1;
+        let mut neighbors = [0u32; 6];
+        let mut weights = [0u32; 6];
+        let count = inst.neigh(vertex, &mut neighbors, &mut weights);
+        for i in 0..count {
+            let next = neighbors[i];
+            // Foreign pins are hard in both directions; owning a movable net
+            // never permits traversing its terminals as a nomination shortcut.
+            let pin = inst.pin_owner[next as usize];
+            if pin >= 0 && pin != seed as i32 {
+                continue;
+            }
+            let mut next_owners = owners.clone();
+            let occupied = owner[next as usize];
+            if occupied >= 0 && occupied != seed as i32 {
+                let occupied = occupied as usize;
+                match next_owners.binary_search(&occupied) {
+                    Ok(_) => {}
+                    Err(at) => {
+                        if next_owners.len() >= max_owners {
+                            continue;
+                        }
+                        next_owners.insert(at, occupied);
+                    }
+                }
+            }
+            let Some(next_distance) = distance.checked_add(weights[i] as u64) else {
+                stats.truncated = true;
+                continue;
+            };
+            let estimate = next_distance.saturating_add(goal_bound(inst, goals, next, planar) as u64);
+            if estimate >= strict_limit as u64 {
+                continue;
+            }
+            let key = (next, next_owners.clone());
+            if side.best.get(&key).is_some_and(|&old| old <= next_distance) {
+                continue;
+            }
+            let is_new_state = !side.best.contains_key(&key);
+            if is_new_state && side.per_vertex[next as usize] >= per_vertex_cap {
+                stats.truncated = true;
+                continue;
+            }
+            if side.labels_pushed >= side.label_cap {
+                stats.truncated = true;
+                side.disabled = true;
+                return;
+            }
+            if is_new_state {
+                side.per_vertex[next as usize] += 1;
+                side.by_vertex.entry(next).or_default().push(next_owners.clone());
+            }
+            side.best.insert(key, next_distance);
+            side.queue.push(Reverse((estimate, next_distance, next, next_owners.clone())));
+            side.labels_pushed += 1;
+            stats.labels_pushed += 1;
+            owner_set_record_meetings(
+                stats,
+                joined,
+                next,
+                next_distance,
+                &next_owners,
+                opposite,
+                max_owners,
+                strict_limit,
+            );
+        }
+        return;
+    }
+}
+
+fn owner_set_sink_labels(
+    inst: &Inst,
+    owner: &[i32],
+    seed: usize,
+    sink: u32,
+    strict_limit: u32,
+    max_owners: usize,
+    max_labels: usize,
+    max_expansions: usize,
+    per_vertex_cap: usize,
+) -> OwnerSetSearchStats {
+    owner_set_path_labels(
+        inst, owner, seed, inst.nets[seed].driver, sink, strict_limit, max_owners,
+        max_labels, max_expansions, per_vertex_cap,
+    )
+}
+/// Bidirectional A* over exact `(vertex, sorted owner-set)` product states.
+/// Each direction has at most half of the unchanged push/expansion budgets.
+/// There is no subset dominance and the search does not stop at its first meet.
+/// Complete uncapped searches enumerate all strict-improvement owner unions in
+/// the bounded product graph; capped searches retain any valid unions found and
+/// report incompleteness. Joined walks are nominations only, never final trees.
+fn owner_set_path_labels(
+    inst: &Inst,
+    owner: &[i32],
+    seed: usize,
+    start: u32,
+    sink: u32,
+    strict_limit: u32,
+    max_owners: usize,
+    max_labels: usize,
+    max_expansions: usize,
+    per_vertex_cap: usize,
+) -> OwnerSetSearchStats {
+    let mut stats = OwnerSetSearchStats::default();
+    if seed >= inst.nets.len() || start >= inst.n || sink >= inst.n || max_labels == 0 || per_vertex_cap == 0 {
+        stats.truncated = true;
+        return stats;
+    }
+    let goal_xyz = inst.xyz(sink);
+    let start_xyz = inst.xyz(start);
+    let goal = [goal_xyz];
+    let source = [start_xyz];
+    let planar = *inst.ld.iter().min().unwrap_or(&1);
+    if goal_bound(inst, &goal, start, planar) >= strict_limit
+        || goal_bound(inst, &source, sink, planar) >= strict_limit
+    {
+        return stats;
+    }
+
+    let forward_cap = max_labels / 2 + max_labels % 2;
+    let reverse_cap = max_labels / 2;
+    let forward_expansion_cap = max_expansions / 2 + max_expansions % 2;
+    let reverse_expansion_cap = max_expansions / 2;
+    let mut forward = OwnerLabelSide::new(inst.n, forward_cap, forward_expansion_cap);
+    let mut reverse = OwnerLabelSide::new(inst.n, reverse_cap, reverse_expansion_cap);
+    if forward_cap > 0 {
+        forward.seed(start, goal_bound(inst, &goal, start, planar));
+        stats.labels_pushed += 1;
+    } else {
+        forward.disabled = true;
+        stats.truncated = true;
+    }
+    if reverse_cap > 0 {
+        reverse.seed(sink, goal_bound(inst, &source, sink, planar));
+        stats.labels_pushed += 1;
+    } else {
+        reverse.disabled = true;
+        stats.truncated = true;
+    }
+    let mut joined = std::collections::HashMap::<Vec<usize>, u64>::new();
+    if start == sink {
+        joined.insert(Vec::new(), 0);
+    }
+
+    loop {
+        if !forward.disabled && !owner_side_has_live_label(&mut forward) {
+            forward.disabled = true;
+        }
+        if !reverse.disabled && !owner_side_has_live_label(&mut reverse) {
+            reverse.disabled = true;
+        }
+        if !forward.disabled && (forward.labels_pushed >= forward.label_cap
+            || forward.expansions >= forward.expansion_cap)
+        {
+            if owner_side_has_live_label(&mut forward) { stats.truncated = true; }
+            forward.disabled = true;
+        }
+        if !reverse.disabled && (reverse.labels_pushed >= reverse.label_cap
+            || reverse.expansions >= reverse.expansion_cap)
+        {
+            if owner_side_has_live_label(&mut reverse) { stats.truncated = true; }
+            reverse.disabled = true;
+        }
+        if forward.disabled && reverse.disabled { break; }
+
+        let expand_forward = match (forward.disabled, reverse.disabled) {
+            (false, true) => true,
+            (true, false) => false,
+            (false, false) => {
+                let f_f = forward.queue.peek().map(|x| (x.0).0).unwrap_or(u64::MAX);
+                let f_r = reverse.queue.peek().map(|x| (x.0).0).unwrap_or(u64::MAX);
+                f_f < f_r || (f_f == f_r && forward.expansions <= reverse.expansions)
+            }
+            (true, true) => break,
+        };
+        if expand_forward {
+            owner_set_expand_side(
+                inst, owner, seed, &goal, planar, &mut forward, &reverse, &mut stats,
+                &mut joined, max_owners, strict_limit, per_vertex_cap,
+            );
+        } else {
+            owner_set_expand_side(
+                inst, owner, seed, &source, planar, &mut reverse, &forward, &mut stats,
+                &mut joined, max_owners, strict_limit, per_vertex_cap,
+            );
+        }
+    }
+
+    stats.sink_labels = joined.into_iter().map(|(owners, distance)| (distance, owners)).collect();
+    stats.sink_labels.sort_unstable();
+    stats
+}
+
+fn owner_set_group_for_sink(
+    inst: &Inst,
+    owner: &[i32],
+    seed: usize,
+    sink: u32,
+    current_sink_delay: u32,
+) -> (Vec<usize>, OwnerSetSearchStats) {
+    let mut stats = owner_set_sink_labels(
+        inst,
+        owner,
+        seed,
+        sink,
+        current_sink_delay,
+        OWNER_SET_GROUP_MEMBER_CAP - 1,
+        OWNER_SET_LABEL_LIMIT,
+        OWNER_SET_EXPANSION_LIMIT,
+        OWNER_SET_LABELS_PER_VERTEX,
+    );
+    let best = stats
+        .sink_labels
+        .iter()
+        .filter(|(distance, owners)| !owners.is_empty() && *distance < current_sink_delay as u64)
+        .min_by(|(da, oa), (db, ob)| oa.len().cmp(&ob.len()).then(da.cmp(db)).then(oa.cmp(ob)))
+        .map(|(_, owners)| owners.clone());
+    let group = best.map_or_else(Vec::new, |owners| {
+        let mut group = Vec::with_capacity(owners.len() + 1);
+        group.push(seed);
+        group.extend(owners);
+        group
+    });
+    stats.sink_labels.clear();
+    (group, stats)
+}
+
+const OWNER_SET_SHORTCUT_ANCHOR_CAP: usize = 64;
+
+#[derive(Clone, Copy, Debug)]
+struct OwnerShortcutPair {
+    start: u32,
+    end: u32,
+    segment_delay: u32,
+    free_bound: u32,
+    detour_gap: u32,
+    descendant_sinks: u32,
+}
+impl OwnerShortcutPair {
+    fn numerator(self) -> u128 { self.detour_gap as u128 * self.descendant_sinks as u128 }
+    fn denominator(self) -> u128 { self.free_bound as u128 + 1 }
+}
+
+/// Rank ancestor/descendant pairs on the incumbent slow-sink tree path.
+/// The exact rational score orders nominations only; it is not a gain bound.
+fn owner_set_shortcut_pairs(
+    inst: &Inst,
+    seed: usize,
+    edges: &[(u32, u32)],
+    sink: u32,
+) -> (usize, Vec<OwnerShortcutPair>) {
+    if seed >= inst.nets.len() || sink >= inst.n { return (0, Vec::new()); }
+    let root = inst.nets[seed].driver;
+    let mut adjacency = std::collections::HashMap::<u32, Vec<u32>>::new();
+    for &(a, b) in edges {
+        adjacency.entry(a).or_default().push(b);
+        adjacency.entry(b).or_default().push(a);
+    }
+    let mut parent = std::collections::HashMap::<u32, u32>::new();
+    let mut root_distance = std::collections::HashMap::<u32, u32>::new();
+    parent.insert(root, root);
+    root_distance.insert(root, 0);
+    let mut stack = vec![root];
+    while let Some(vertex) = stack.pop() {
+        let base = root_distance[&vertex];
+        if let Some(neighbors) = adjacency.get(&vertex) {
+            for &next in neighbors {
+                if parent.contains_key(&next) { continue; }
+                let Some(weight) = edge_w(inst, vertex, next) else { continue; };
+                let Some(distance) = base.checked_add(weight) else { return (0, Vec::new()); };
+                parent.insert(next, vertex);
+                root_distance.insert(next, distance);
+                stack.push(next);
+            }
+        }
+    }
+    if !parent.contains_key(&sink) { return (0, Vec::new()); }
+    let mut descendant_sinks = std::collections::HashMap::<u32, u32>::new();
+    for &terminal in &inst.nets[seed].sinks {
+        let mut vertex = terminal;
+        loop {
+            let count = descendant_sinks.entry(vertex).or_default();
+            let Some(next_count) = count.checked_add(1) else { return (0, Vec::new()); };
+            *count = next_count;
+            if vertex == root { break; }
+            let Some(&up) = parent.get(&vertex) else { return (0, Vec::new()); };
+            if up == vertex { return (0, Vec::new()); }
+            vertex = up;
+        }
+    }
+    let mut path = Vec::new();
+    let mut vertex = sink;
+    loop {
+        path.push(vertex);
+        if vertex == root { break; }
+        let Some(&up) = parent.get(&vertex) else { return (0, Vec::new()); };
+        if up == vertex { return (0, Vec::new()); }
+        vertex = up;
+    }
+    path.reverse();
+    let anchors: Vec<usize> = if path.len() <= OWNER_SET_SHORTCUT_ANCHOR_CAP {
+        (0..path.len()).collect()
+    } else {
+        let last = path.len() - 1;
+        let denom = OWNER_SET_SHORTCUT_ANCHOR_CAP - 1;
+        (0..OWNER_SET_SHORTCUT_ANCHOR_CAP)
+            .map(|i| (i * last + denom / 2) / denom)
+            .collect()
+    };
+    let planar = *inst.ld.iter().min().unwrap_or(&1);
+    let mut pairs = Vec::new();
+    for left in 0..anchors.len() {
+        for right in left + 1..anchors.len() {
+            let start = path[anchors[left]];
+            let end = path[anchors[right]];
+            let Some(&start_distance) = root_distance.get(&start) else { continue; };
+            let Some(&end_distance) = root_distance.get(&end) else { continue; };
+            let Some(segment_delay) = end_distance.checked_sub(start_distance) else { continue; };
+            let goal = [inst.xyz(end)];
+            let free_bound = goal_bound(inst, &goal, start, planar);
+            if segment_delay <= free_bound { continue; }
+            let Some(&descendant_count) = descendant_sinks.get(&end) else { continue; };
+            if descendant_count == 0 { continue; }
+            pairs.push(OwnerShortcutPair {
+                start, end, segment_delay, free_bound,
+                detour_gap: segment_delay - free_bound,
+                descendant_sinks: descendant_count,
+            });
+        }
+    }
+    pairs.sort_unstable_by(|a, b| {
+        (b.numerator() * a.denominator())
+            .cmp(&(a.numerator() * b.denominator()))
+            .then(a.segment_delay.cmp(&b.segment_delay))
+            .then(a.start.cmp(&b.start))
+            .then(a.end.cmp(&b.end))
+    });
+    (anchors.len(), pairs)
+}
+
+fn owner_set_group_for_shortcut(
+    inst: &Inst,
+    owner: &[i32],
+    seed: usize,
+    edges: &[(u32, u32)],
+    sink: u32,
+) -> (Vec<usize>, OwnerSetSearchStats, usize, usize, Option<(u32, u32)>) {
+    let (anchor_count, pairs) = owner_set_shortcut_pairs(inst, seed, edges, sink);
+    let pair_count = pairs.len();
+    let Some(pair) = pairs.first().copied() else {
+        return (Vec::new(), OwnerSetSearchStats::default(), anchor_count, pair_count, None);
+    };
+    let stats = owner_set_path_labels(
+        inst, owner, seed, pair.start, pair.end, pair.segment_delay,
+        OWNER_SET_GROUP_MEMBER_CAP - 1, OWNER_SET_LABEL_LIMIT,
+        OWNER_SET_EXPANSION_LIMIT, OWNER_SET_LABELS_PER_VERTEX,
+    );
+    let best = stats.sink_labels.iter()
+        .filter(|(distance, owners)| !owners.is_empty() && *distance < pair.segment_delay as u64)
+        .min_by(|(da, oa), (db, ob)| oa.len().cmp(&ob.len()).then(da.cmp(db)).then(oa.cmp(ob)))
+        .map(|(_, owners)| owners.clone());
+    let group = best.map_or_else(Vec::new, |owners| {
+        let mut group = Vec::with_capacity(owners.len() + 1);
+        group.push(seed);
+        group.extend(owners);
+        group
+    });
+    (group, stats, anchor_count, pair_count, Some((pair.start, pair.end)))
+}
+fn fallback_owner_set_group(
+    inst: &Inst,
+    sol: &Solution,
+    owner: &[i32],
+    ws: &mut Scratch,
+    seed: usize,
+) -> Vec<usize> {
+    let mut group = blocker_group(
+        inst,
+        sol,
+        owner,
+        ws,
+        seed,
+        OWNER_SET_GROUP_MEMBER_CAP,
+    );
+    if group.len() < 2 {
+        let radius = 1 + ws.rng.below(8) as u32;
+        group = region_group(
+            inst,
+            sol,
+            owner,
+            ws,
+            seed,
+            radius,
+            OWNER_SET_GROUP_MEMBER_CAP,
+        );
+    }
+    group
+}
+
+/// Optional postphase run after cold refinement, stable polish and recursive
+/// profile selection. Modes 1 and 2 use the same 16 seed slots and at most 16
+/// bounded CBS calls. Mode 1 is the seeded blocker/region nomination control;
+/// mode 2 replaces nomination with exact owner-set labels and falls back to the
+/// same control only when it found no valid group.
+pub fn owner_set_group_output(instance: &str, own_output: &str, mode: u8, seed: u64) -> u64 {
+    assert!(mode == 1 || mode == 2 || mode == 3);
+    let mut inst = load_inst(instance);
+    inst.early_stop = true;
+    inst.use_radix = true;
+    inst.use_dial = true;
+    inst.use_astar = true;
+    inst.budget_bound = true;
+    inst.retain_negotiated = true;
+    let mut sol = load_solution(&inst, own_output).expect("owner-set phase requires its own legal output");
+    let original_total = sol.total;
+    let mut owner = vec![-1i32; inst.n as usize];
+    for nid in 0..inst.nets.len() {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut seeds: Vec<usize> = (0..inst.nets.len()).collect();
+    seeds.sort_unstable_by(|&a, &b| sol.delay[b].cmp(&sol.delay[a]).then(a.cmp(&b)));
+    seeds.truncate(OWNER_SET_GROUP_SLOTS);
+    let seed_slots = seeds.len();
+
+    let mut labels_pushed = 0usize;
+    let mut expansions = 0usize;
+    let mut join_probes = 0usize;
+    let mut truncated_queries = 0usize;
+    let mut fallback_groups = 0usize;
+    let mut shortcut_anchors = 0usize;
+    let mut shortcut_pairs_ranked = 0usize;
+    let mut shortcut_pair_searches = 0usize;
+    let mut shortcut_selected = Vec::<String>::new();
+    let mut calls = 0usize;
+    let mut accepted = 0usize;
+    let mut seen_groups = std::collections::HashSet::<Vec<usize>>::new();
+    for (slot, seed_net) in seeds.into_iter().enumerate() {
+        if calls >= OWNER_SET_CBS_CALL_LIMIT || inst.nets[seed_net].sinks.is_empty() {
+            continue;
+        }
+        let sink_delays = physical_sink_delays(&inst, seed_net, &sol.edges[seed_net]);
+        let mut slowest = 0usize;
+        for i in 1..sink_delays.len() {
+            if sink_delays[i] > sink_delays[slowest]
+                || (sink_delays[i] == sink_delays[slowest]
+                    && inst.nets[seed_net].sinks[i] < inst.nets[seed_net].sinks[slowest])
+            {
+                slowest = i;
+            }
+        }
+        let slot_seed = seed
+            .wrapping_add((slot as u64).wrapping_mul(0x9E3779B97F4A7C15))
+            .wrapping_add(0x6F776E6572736574);
+        let mut ws = Scratch::new(inst.n, inst.nets.len(), slot_seed);
+        let group = if mode == 2 {
+            let (candidate, stats) = owner_set_group_for_sink(
+                &inst,
+                &owner,
+                seed_net,
+                inst.nets[seed_net].sinks[slowest],
+                sink_delays[slowest],
+            );
+            labels_pushed += stats.labels_pushed;
+            expansions += stats.expansions;
+            join_probes += stats.join_probes;
+            truncated_queries += stats.truncated as usize;
+            if candidate.len() >= 2 {
+                candidate
+            } else {
+                fallback_groups += 1;
+                fallback_owner_set_group(&inst, &sol, &owner, &mut ws, seed_net)
+            }
+        } else if mode == 3 {
+            let (candidate, stats, anchors, pair_count, selected_pair) = owner_set_group_for_shortcut(
+                &inst, &owner, seed_net, &sol.edges[seed_net], inst.nets[seed_net].sinks[slowest],
+            );
+            labels_pushed += stats.labels_pushed;
+            expansions += stats.expansions;
+            join_probes += stats.join_probes;
+            truncated_queries += stats.truncated as usize;
+            shortcut_anchors += anchors;
+            shortcut_pairs_ranked += pair_count;
+            if let Some((a, b)) = selected_pair {
+                shortcut_pair_searches += 1;
+                shortcut_selected.push(format!("{seed_net}:{a}-{b}"));
+            }
+            if candidate.len() >= 2 {
+                candidate
+            } else {
+                fallback_groups += 1;
+                fallback_owner_set_group(&inst, &sol, &owner, &mut ws, seed_net)
+            }
+        } else {
+            fallback_groups += 1;
+            fallback_owner_set_group(&inst, &sol, &owner, &mut ws, seed_net)
+        };
+        if group.len() < 2 || group.len() > OWNER_SET_GROUP_MEMBER_CAP {
+            continue;
+        }
+        let mut key = group.clone();
+        key.sort_unstable();
+        key.dedup();
+        if key.len() != group.len() || !seen_groups.insert(key.clone()) {
+            continue;
+        }
+        let mut group = key;
+        group.sort_unstable();
+        calls += 1;
+        let before = sol.total;
+        let result = cbs::group_move(
+            &inst,
+            &mut sol,
+            &mut owner,
+            &mut ws,
+            &group,
+            256,
+            false,
+            Instant::now() + Duration::from_secs(86_400),
+        );
+        if result.is_some() {
+            assert!(sol.total < before, "CBS must accept only strict physical gains");
+            accepted += 1;
+        } else {
+            assert_eq!(sol.total, before, "failed CBS nomination must roll back the incumbent");
+        }
+    }
+    assert_consistent_state(&inst, &sol, &owner);
+    if sol.total < original_total {
+        let candidate_path = format!("{own_output}.owner-set-{}-{seed}.tmp", std::process::id());
+        write_sol(&inst, &sol, &candidate_path).expect("write private owner-set candidate");
+        let checked = load_solution(&inst, &candidate_path)
+            .expect("owner-set candidate must pass the full-layout loader before replacement");
+        assert!(checked.total < original_total, "candidate loader must confirm strict whole-layout gain");
+        assert_eq!(checked.total, sol.total);
+        assert_consistent_state(&inst, &checked, &owner);
+        let bytes = std::fs::read(&candidate_path).expect("read validated own candidate bytes");
+        std::fs::remove_file(&candidate_path).expect("remove private candidate after validation");
+        std::fs::write(own_output, bytes).expect("replace own output with validated strict improvement");
+    }
+    println!(
+        "OWNER_SET_GROUPS mode={} slots={} cbs_calls={} accepted={} labels_pushed={} expansions={} join_probes={} truncated_queries={} fallback_groups={} before={} after={}",
+        mode,
+        seed_slots,
+        calls,
+        accepted,
+        labels_pushed,
+        expansions,
+        join_probes,
+        truncated_queries,
+        fallback_groups,
+        original_total,
+        sol.total
+    );
+    if mode == 3 {
+        println!(
+            "OWNER_SET_SHORTCUTS anchors={} eligible_pairs={} pair_searches={} chosen={}",
+            shortcut_anchors, shortcut_pairs_ranked, shortcut_pair_searches, shortcut_selected.join(",")
+        );
+    }
+    sol.total
+}
+
+pub fn stable_polish_output(instance: &str, own_output: &str, passes: usize) -> u64 {
+    assert!((1..=64).contains(&passes));
+    let mut inst = load_inst(instance);
+    inst.early_stop = true;
+    inst.use_radix = true;
+    inst.use_dial = true;
+    inst.use_astar = true;
+    inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+    let original = load_solution(&inst, own_output).expect("own completed output must be legal");
+    let mut best: Option<Solution> = None;
+    for (reverse_vertices, reverse_nets) in
+        [(false, false), (true, false), (false, true), (true, true)]
+    {
+        let mut candidate = original.clone();
+        stable_polish_order(
+            &inst,
+            &mut candidate,
+            passes,
+            reverse_vertices,
+            reverse_nets,
+        );
+        if best.as_ref().map_or(true, |b| {
+            (candidate.total, candidate.vcount) < (b.total, b.vcount)
+        }) {
+            best = Some(candidate);
+        }
+    }
+    let best = best.unwrap();
+    assert!(best.total <= original.total);
+    write_sol(&inst, &best, own_output).expect("write own stable-polished output");
+    println!(
+        "STABLE_FINISH profiles=4 passes={} before={} after={} gain={}",
+        passes,
+        original.total,
+        best.total,
+        original.total - best.total
+    );
+    best.total
+}
+
+fn compact_polish(inst: &Inst, sol: &mut Solution, seed: u64, limit: usize) {
+    let mut owner = vec![-1; inst.n as usize];
+    for nid in 0..inst.nets.len() {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut ws = Scratch::new(inst.n, inst.nets.len(), seed);
+    let before = (sol.total, sol.vcount);
+    let mut passes = 0;
+    for pass in 0..limit {
+        passes += 1;
+        let previous = (sol.total, sol.vcount);
+        for nid in 0..inst.nets.len() {
+            uncommit(&mut owner, &sol.verts[nid]);
+            let budgets = physical_sink_delays(inst, nid, &sol.edges[nid]);
+            ws.dijkstra_bounded(inst, &owner, nid, &budgets, false);
+            let mut candidate = ws.extract(inst, &inst.nets[nid]);
+            for farthest in [false, true] {
+                let salt = seed ^ ((pass as u64) << 32) ^ nid as u64;
+                if let Some(compact) = ws.extract_compact(inst, &inst.nets[nid], salt, farthest) {
+                    if candidate
+                        .as_ref()
+                        .map_or(true, |c| (compact.2, compact.0.len()) < (c.2, c.0.len()))
+                    {
+                        candidate = Some(compact);
+                    }
+                }
+            }
+            if let Some((vertices, edges, delay)) = candidate {
+                if (delay, vertices.len()) < (sol.delay[nid], sol.verts[nid].len()) {
+                    sol.total = sol.total - sol.delay[nid] + delay;
+                    sol.vcount = sol.vcount - sol.verts[nid].len() as u64 + vertices.len() as u64;
+                    sol.delay[nid] = delay;
+                    sol.verts[nid] = vertices;
+                    sol.edges[nid] = edges;
+                }
+            }
+            commit(&mut owner, nid, &sol.verts[nid]);
+        }
+        assert!((sol.total, sol.vcount) <= previous);
+        if (sol.total, sol.vcount) == previous {
+            break;
+        }
+    }
+    println!("COMPACT_POLISH passes={} delay_before={} delay_after={} vertices_before={} vertices_after={}",passes,before.0,sol.total,before.1,sol.vcount);
+}
+
+fn pair_sweep(inst: &Inst, sol: &mut Solution, seed: u64, attempts: u64, secs: f64) {
+    let started = Instant::now();
+    let before = sol.total;
+    let nn = inst.nets.len();
+    let mut owner = vec![-1; inst.n as usize];
+    for nid in 0..nn {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut ws = Scratch::new(inst.n, nn, seed);
+    let mut ing = vec![false; nn];
+    let mut screened = 0;
+    let mut promising = 0;
+    let mut trials = 0;
+    let mut improvements = 0;
+    'sweeps: for _ in 0..3 {
+        for a in 0..nn {
+            for b in a + 1..nn {
+                if started.elapsed().as_secs_f64() >= secs {
+                    break 'sweeps;
+                }
+                uncommit(&mut owner, &sol.verts[a]);
+                uncommit(&mut owner, &sol.verts[b]);
+                let mut bound = 0u64;
+                for nid in [a, b] {
+                    // Existing per-sink distances remain feasible when only
+                    // resources are released. Their independent shortest sums
+                    // are a lower bound even if the two resulting trees conflict.
+                    if inst.budget_bound {
+                        let budgets = physical_sink_delays(inst, nid, &sol.edges[nid]);
+                        ws.dijkstra_bounded(inst, &owner, nid, &budgets, false);
+                    } else {
+                        ws.dijkstra(
+                            inst,
+                            &owner,
+                            inst.nets[nid].driver,
+                            nid as i32,
+                            false,
+                            u32::MAX,
+                        );
+                    }
+                    for &sink in &inst.nets[nid].sinks {
+                        assert_eq!(
+                            ws.stamp[sink as usize], ws.cur,
+                            "old route must remain feasible"
+                        );
+                        bound += ws.dist[sink as usize] as u64;
+                    }
+                }
+                commit(&mut owner, a, &sol.verts[a]);
+                commit(&mut owner, b, &sol.verts[b]);
+                screened += 1;
+                assert!(bound <= sol.delay[a] + sol.delay[b]);
+                if bound == sol.delay[a] + sol.delay[b] {
+                    continue;
+                }
+                promising += 1;
+                for trial in 0..attempts {
+                    if started.elapsed().as_secs_f64() >= secs {
+                        break 'sweeps;
+                    }
+                    let group = if trial % 2 == 0 { [a, b] } else { [b, a] };
+                    let old = sol.total;
+                    if inst.retain_negotiated && trial % 3 == 2 {
+                        neg_group_move(
+                            inst,
+                            sol,
+                            &mut owner,
+                            &mut ing,
+                            &mut ws,
+                            &group,
+                            8,
+                            0.5,
+                            1.7,
+                            0.5,
+                            1.0,
+                            0,
+                            false,
+                            u32::MAX,
+                        );
+                    } else {
+                        group_move(
+                            inst,
+                            sol,
+                            &mut owner,
+                            &mut ws,
+                            &group,
+                            1,
+                            0,
+                            false,
+                            u32::MAX,
+                            true,
+                        );
+                    }
+                    trials += 1;
+                    if inst.check_state {
+                        assert_consistent_state(inst, sol, &owner);
+                    }
+                    if sol.total < old {
+                        improvements += 1;
+                        println!(
+                            "PAIR gain={} total={} a={} b={} bound={}",
+                            old - sol.total,
+                            sol.total,
+                            a,
+                            b,
+                            bound
+                        );
+                    }
+                    if sol.delay[a] + sol.delay[b] == bound {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    assert_consistent_state(inst, sol, &owner);
+    println!("PAIR_SWEEP screened={} promising={} trials={} improvements={} before={} after={} seconds={:.6}",screened,promising,trials,improvements,before,sol.total,started.elapsed().as_secs_f64());
+}
+
+fn assert_consistent_state(inst: &Inst, sol: &Solution, owner: &[i32]) {
+    let mut expected = vec![-1i32; inst.n as usize];
+    let mut total = 0;
+    for nid in 0..inst.nets.len() {
+        for &v in &sol.verts[nid] {
+            assert_eq!(expected[v as usize], -1, "shared vertex {}", v);
+            expected[v as usize] = nid as i32;
+        }
+        let delay = physical_tree_delay(inst, nid, &sol.edges[nid]);
+        assert_eq!(delay, sol.delay[nid], "net {} delay mismatch", nid);
+        total += delay;
+    }
+    assert_eq!(total, sol.total);
+    assert_eq!(expected, owner, "ownership cache inconsistent");
+}
+
+struct Best {
+    total: u64,
+    sol: Option<Solution>,
+    gen: u64,
+}
+
+/// Refine only a cold solution constructed in this invocation by our controller.
+#[derive(Clone)]
+pub struct Options {
+    pub temperature: u64,
+    pub slack: u64,
+    pub group_max: usize,
+    pub compact_shortest_tree: bool,
+    pub post_cbs_trials: u64,
+    pub post_cbs_bypass_trials: u64,
+    pub cbs_bypass: bool,
+    pub cbs_conflict_priority: bool,
+    pub cbs_nodes: usize,
+    pub cbs_group_max: usize,
+    pub joint_neutral: u64,
+    pub joint_group_max: usize,
+    pub penalized_astar: bool,
+    pub penalized_integer_queue: bool,
+    pub penalized_heuristic_cache: bool,
+    pub compact_polish_passes: usize,
+    pub retain_compact_best: bool,
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            temperature: 32,
+            slack: 128,
+            group_max: 16,
+            compact_shortest_tree: false,
+            post_cbs_trials: 0,
+            post_cbs_bypass_trials: 0,
+            cbs_bypass: false,
+            cbs_conflict_priority: false,
+            cbs_nodes: 256,
+            cbs_group_max: 4,
+            joint_neutral: 0,
+            joint_group_max: 4,
+            penalized_astar: false,
+            penalized_integer_queue: false,
+            retain_compact_best: false,
+            penalized_heuristic_cache: false,
+            compact_polish_passes: 0,
+        }
+    }
+}
+
+pub fn refine_cold(
+    instance_path: &str,
+    cold_path: &str,
+    output_path: &str,
+    seed: u64,
+    trials: u64,
+    mode: &str,
+    options: &Options,
+) -> u64 {
+    assert!(
+        trials > 0
+            && matches!(
+                mode,
+                "chain-fast"
+                    | "chain-polish-fast"
+                    | "chain-entry-fast"
+                    | "mixed"
+                    | "single"
+                    | "joint"
+                    | "mixed-joint"
+                    | "cbs"
+                    | "cbs-mixed"
+            )
+    );
+    assert!((2..=64).contains(&options.group_max));
+    assert!(options.cbs_nodes > 0);
+    assert!((2..=8).contains(&options.cbs_group_max));
+    assert!(options.joint_neutral <= 2);
+    assert!(options.compact_polish_passes <= 64);
+    assert!((2..=6).contains(&options.joint_group_max));
+    let start = Instant::now();
+    let mut inst = load_inst(instance_path);
+    inst.early_stop = true;
+    inst.use_radix = true;
+    inst.use_dial = true;
+    inst.use_astar = true;
+    inst.budget_bound = true;
+    inst.retain_negotiated = true;
+    let inst = Arc::new(inst);
+    let mut init =
+        load_solution(&inst, cold_path).expect("internally generated cold solution must be legal");
+    strict_polish(&inst, &mut init, seed);
+    if options.compact_polish_passes > 0 {
+        compact_polish(
+            &inst,
+            &mut init,
+            seed ^ 0xC0194B72,
+            options.compact_polish_passes,
+        );
+    }
+    let mut scr = Scratch::new(inst.n, inst.nets.len(), seed ^ 0xABCD);
+    let owner = vec![-1; inst.n as usize];
+    let mut ideal = Vec::new();
+    for nid in 0..inst.nets.len() {
+        let budgets = physical_sink_delays(&inst, nid, &init.edges[nid]);
+        scr.dijkstra_bounded(&inst, &owner, nid, &budgets, true);
+        ideal.push(
+            inst.nets[nid]
+                .sinks
+                .iter()
+                .map(|&s| scr.dist[s as usize] as u64)
+                .sum(),
+        );
+    }
+    let shared = Arc::new(Mutex::new(Best {
+        total: init.total,
+        sol: Some(init.clone()),
+        gen: 0,
+    }));
+    // Fixed trial count controls output; this deadline is unused by these modes.
+    let deadline = Instant::now() + Duration::from_secs(365 * 24 * 3600);
+    worker(
+        Arc::clone(&inst),
+        init,
+        ideal,
+        Arc::clone(&shared),
+        output_path.into(),
+        "cold-refine".into(),
+        0,
+        seed,
+        mode.into(),
+        2,
+        options.group_max,
+        8,
+        2,
+        options.temperature as f64,
+        0.15,
+        0.0,
+        12,
+        0.5,
+        1.7,
+        0.5,
+        1.0,
+        false,
+        true,
+        true,
+        u32::MAX,
+        deadline,
+        trials,
+        3,
+        true,
+        true,
+        Some(options.slack),
+        0.0,
+        options.compact_shortest_tree,
+        options.cbs_nodes,
+        options.cbs_group_max,
+        options.cbs_bypass,
+        options.cbs_conflict_priority,
+        options.joint_neutral,
+        options.joint_group_max,
+        options.penalized_astar,
+        options.penalized_integer_queue,
+        options.retain_compact_best,
+        options.penalized_heuristic_cache,
+    );
+    let mut best = shared.lock().unwrap();
+    if let Some(ref mut sol) = best.sol {
+        strict_polish(&inst, sol, seed);
+        if options.compact_polish_passes > 0 {
+            compact_polish(&inst, sol, seed ^ 0xC0194B73, options.compact_polish_passes);
+        }
+        write_sol(&inst, sol, output_path).unwrap();
+        eprintln!(
+            "REFINEMENT_FINAL delay={} trials={} seconds={:.6}",
+            sol.total,
+            trials,
+            start.elapsed().as_secs_f64()
+        );
+        sol.total
+    } else {
+        panic!("refinement lost its legal incumbent")
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn worker(
+    inst: Arc<Inst>,
+    init: Solution,
+    ideal_delay: Vec<u64>,
+    shared: Arc<Mutex<Best>>,
+    out_path: String,
+    tag: String,
+    widx: usize,
+    seed: u64,
+    mode: String,
+    kmin: usize,
+    kmax: usize,
+    rmax: u32,
+    passes: u32,
+    t0: f64,
+    neg_frac: f64,
+    neg_all: f64,
+    neg_rounds: u32,
+    neg_pf0: f64,
+    neg_pm: f64,
+    neg_hf: f64,
+    neg_vc: f64,
+    dump_final: bool,
+    nosync: bool,
+    compact: bool,
+    ub: u32,
+    deadline: Instant,
+    max_trials: u64,
+    tournament: usize,
+    finish_walk: bool,
+    rescue: bool,
+    walk_slack: Option<u64>,
+    detour_frac: f64,
+    compact_shortest_tree: bool,
+    cbs_nodes: usize,
+    cbs_group_max: usize,
+    cbs_bypass: bool,
+    cbs_conflict_priority: bool,
+    joint_neutral: u64,
+    joint_group_max: usize,
+    penalized_astar: bool,
+    penalized_integer_queue: bool,
+    retain_compact_best: bool,
+    penalized_heuristic_cache: bool,
+) {
+    let thr0 = t0;
+    let mut sol = init.clone();
+    let nn = inst.nets.len();
+    let mut owner = vec![-1i32; inst.n as usize];
+    for nid in 0..nn {
+        commit(&mut owner, nid, &sol.verts[nid]);
+    }
+    let mut ing = vec![false; nn];
+    let total_secs = {
+        let e = deadline
+            .saturating_duration_since(Instant::now())
+            .as_secs_f64();
+        if e > 1e-9 {
+            e
+        } else {
+            1e-9
+        }
+    };
+    let mut ws = Scratch::new(
+        inst.n,
+        nn,
+        seed.wrapping_add((widx as u64).wrapping_mul(0x9E3779B97F4A7C15)),
+    );
+    ws.penalized_astar = penalized_astar;
+    ws.penalized_integer_queue = penalized_integer_queue;
+    ws.penalized_heuristic_cache = penalized_heuristic_cache;
+    ws.cbs_conflict_priority = cbs_conflict_priority;
+    let mut trials: u64 = 0;
+    let mut eq: u64 = 0;
+    let mut rejected: u64 = 0;
+    let mut inapp: u64 = 0;
+    let mut imp: u64 = 0;
+    let mut uphill: u64 = 0;
+    let mut chain_polish_stats = ChainPolishStats::default();
+    let mut neg_trials: u64 = 0;
+    let mut local_best = sol.clone();
+    let mut local_best_total = sol.total;
+    let mut last_report = Instant::now();
+    let t0 = Instant::now();
+    let mut last_sync: u64 = 0;
+    let starved_n = (0..nn)
+        .filter(|&nid| ideal_delay[nid] != u64::MAX && sol.delay[nid] > ideal_delay[nid])
+        .count();
+    let gap_sum: i64 = if ideal_delay.iter().any(|&d| d == u64::MAX) {
+        -1
+    } else {
+        (0..nn)
+            .map(|nid| (sol.delay[nid] as i64 - ideal_delay[nid] as i64).max(0))
+            .sum()
+    };
+    println!(
+        "[{}#{}] start: total={} starved={}/{} gap={} mode={} k=[{},{}] passes={}",
+        tag, widx, sol.total, starved_n, nn, gap_sum, mode, kmin, kmax, passes
+    );
+    loop {
+        if trials >= max_trials || (max_trials == u64::MAX && Instant::now() >= deadline) {
+            break;
+        }
+        trials += 1;
+        let mut thr: i64 = if thr0 > 0.0 {
+            let fraction = if max_trials < u64::MAX {
+                1.0 - trials as f64 / max_trials as f64
+            } else {
+                deadline
+                    .saturating_duration_since(Instant::now())
+                    .as_secs_f64()
+                    / total_secs
+            };
+            (thr0 * fraction.clamp(0.0, 1.0)) as i64
+        } else {
+            0
+        };
+        if let Some(slack) = walk_slack {
+            // Bound total excursion above the best local solution, rather
+            // than accumulating one allowed uphill move after another.
+            let room = local_best_total as i64 + slack as i64 - sol.total as i64;
+            thr = thr.min(room);
+        }
+        // A tournament of one samples uniformly, including optimal routes
+        // that may need neutral movement to release a neighboring net.
+        let mut seed_net = ws.rng.below(nn as u64) as usize;
+        for _ in 1..tournament {
+            let cand = ws.rng.below(nn as u64) as usize;
+            let ga = if ideal_delay[cand] == u64::MAX {
+                i64::MIN
+            } else {
+                (sol.delay[cand] - ideal_delay[cand]) as i64
+            };
+            let gb = if ideal_delay[seed_net] == u64::MAX {
+                i64::MIN
+            } else {
+                (sol.delay[seed_net] - ideal_delay[seed_net]) as i64
+            };
+            if ga > gb {
+                seed_net = cand;
+            }
+        }
+        let u: f64 = (ws.rng.next() >> 11) as f64 / ((1u64 << 53) as f64);
+        let do_mode: u8 = if mode == "joint" || (mode == "mixed-joint" && u < 0.35) {
+            4
+        } else if mode == "chain"
+            || mode == "chain-entry"
+            || mode == "chain-fast"
+            || mode == "chain-polish-fast"
+            || mode == "chain-entry-fast"
+        {
+            3
+        } else if mode == "mixed" || mode == "mixed-joint" {
+            if u < 0.75 {
+                0
+            } else if u < 0.90 {
+                1
+            } else {
+                2
+            }
+        } else if mode == "region" {
+            0
+        } else if mode == "blocker" || mode.starts_with("cbs") {
+            1
+        } else {
+            2
+        };
+        let k = kmin + ws.rng.below((kmax - kmin + 1).max(1) as u64) as usize;
+        let mut group: Vec<usize> = if do_mode == 0 {
+            let r = 1 + ws.rng.below(rmax as u64) as u32;
+            region_group(&inst, &sol, &owner, &mut ws, seed_net, r, k)
+        } else if do_mode == 1 || do_mode == 4 {
+            let cap = if do_mode == 4 {
+                joint_group_max
+            } else if mode.starts_with("cbs") {
+                k.min(cbs_group_max)
+            } else {
+                k
+            };
+            let mut g = blocker_group(&inst, &sol, &owner, &mut ws, seed_net, cap);
+            if g.len() < 2 {
+                let r = 1 + ws.rng.below(rmax as u64) as u32;
+                g = region_group(&inst, &sol, &owner, &mut ws, seed_net, r, cap);
+            }
+            g
+        } else {
+            Vec::new()
+        };
+        {
+            let u2: f64 = (ws.rng.next() >> 11) as f64 / ((1u64 << 53) as f64);
+            if do_mode != 2 && neg_all > 0.0 && u2 < neg_all {
+                group = (0..nn).collect();
+            }
+        }
+        if do_mode == 3 {
+            match chain_move(
+                &inst,
+                &mut sol,
+                &mut owner,
+                &mut ws,
+                seed_net,
+                k,
+                thr,
+                mode == "chain-entry" || mode == "chain-entry-fast",
+                mode.ends_with("-fast"),
+                mode == "chain-polish-fast",
+                &mut chain_polish_stats,
+            ) {
+                Some(d) if d < 0 => imp += 1,
+                Some(0) => eq += 1,
+                Some(_) => uphill += 1,
+                None => rejected += 1,
+            }
+        } else if do_mode == 2 {
+            if detour_frac > 0.0
+                && (ws.rng.next() >> 11) as f64 / ((1u64 << 53) as f64) < detour_frac
+            {
+                detour_move(&inst, &mut sol, &mut owner, &mut ws, seed_net, thr);
+            } else {
+                single_move(&inst, &mut sol, &mut owner, &mut ws, seed_net, compact, ub);
+            }
+        } else if group.len() < 2 {
+            inapp += 1;
+        } else {
+            let use_neg =
+                neg_frac > 0.0 && ((ws.rng.next() >> 11) as f64 / ((1u64 << 53) as f64)) < neg_frac;
+            let res = if do_mode == 4 {
+                joint::group_move(
+                    &inst,
+                    &mut sol,
+                    &mut owner,
+                    &mut ws,
+                    &group,
+                    compact_shortest_tree,
+                    joint_neutral,
+                )
+            } else if mode.starts_with("cbs") && (mode != "cbs-mixed" || ws.rng.below(4) != 0) {
+                cbs::group_move(
+                    &inst, &mut sol, &mut owner, &mut ws, &group, cbs_nodes, cbs_bypass, deadline,
+                )
+            } else if use_neg {
+                neg_trials += 1;
+                neg_group_move(
+                    &inst, &mut sol, &mut owner, &mut ing, &mut ws, &group, neg_rounds, neg_pf0,
+                    neg_pm, neg_hf, neg_vc, thr, compact, ub,
+                )
+            } else {
+                group_move(
+                    &inst, &mut sol, &mut owner, &mut ws, &group, passes, thr, compact, ub, rescue,
+                )
+            };
+            match res {
+                Some((d, acc)) => {
+                    if acc {
+                        if d < 0 {
+                            imp += 1;
+                        } else if d == 0 {
+                            eq += 1;
+                        } else {
+                            uphill += 1;
+                        }
+                    } else {
+                        rejected += 1;
+                    }
+                }
+                None => inapp += 1,
+            }
+        }
+        if inst.check_state {
+            assert_consistent_state(&inst, &sol, &owner);
+        }
+        if let Some(slack) = walk_slack {
+            assert!(sol.total <= local_best_total + slack);
+        }
+        if sol.total < local_best_total
+            || (retain_compact_best
+                && sol.total == local_best_total
+                && sol.vcount < local_best.vcount)
+        {
+            let delay_improved = sol.total < local_best_total;
+            local_best = sol.clone();
+            local_best_total = sol.total;
+            if delay_improved {
+                imp += 1;
+            }
+            let mut best = shared.lock().unwrap();
+            if local_best_total < best.total
+                || (retain_compact_best
+                    && local_best_total == best.total
+                    && best
+                        .sol
+                        .as_ref()
+                        .is_some_and(|s| local_best.vcount < s.vcount))
+            {
+                best.total = local_best_total;
+                best.sol = Some(local_best.clone());
+                best.gen += 1;
+                let g = best.gen;
+                // Final-only output: intermediate snapshots stay in memory.
+                println!(
+                    "[{}#{}] {} {} (gen {}, delta vs init {}) trials={} t={:.0}s",
+                    tag,
+                    widx,
+                    if delay_improved {
+                        "NEW BEST"
+                    } else {
+                        "COMPACT BEST"
+                    },
+                    local_best_total,
+                    g,
+                    local_best_total as i64 - init.total as i64,
+                    trials,
+                    t0.elapsed().as_secs_f64()
+                );
+            }
+        }
+        let nosync_w = nosync || (widx % 2 == 1);
+        if !nosync_w && trials - last_sync >= 2000 {
+            last_sync = trials;
+            let best = shared.lock().unwrap();
+            if best.total < local_best_total {
+                if let Some(ref bs) = best.sol {
+                    owner.iter_mut().for_each(|x| *x = -1);
+                    sol = bs.clone();
+                    local_best = bs.clone();
+                    local_best_total = best.total;
+                    for nid in 0..nn {
+                        commit(&mut owner, nid, &sol.verts[nid]);
+                    }
+                }
+            }
+        }
+        if last_report.elapsed().as_secs_f64() >= 5.0 {
+            last_report = Instant::now();
+            println!(
+                "[{}#{}] t={:.0}s trials={} rate={:.0}/s eq={} rej={} imp={} up={} neg={} inapp={} best={} (delta {}) pexp={}",
+                tag,
+                widx,
+                t0.elapsed().as_secs_f64(),
+                trials,
+                trials as f64 / t0.elapsed().as_secs_f64().max(1e-9),
+                eq,
+                rejected,
+                imp,
+                uphill,
+                neg_trials,
+                inapp,
+                local_best_total,
+                local_best_total as i64 - init.total as i64,
+                ws.pen_expanded
+            );
+        }
+    }
+    if finish_walk {
+        // The best snapshot may predate thousands of useful neutral moves.
+        // Complete coordinate descent on the walk's final geometry before
+        // discarding it. Always compare physical delay, never search prices.
+        strict_polish(&inst, &mut sol, seed.wrapping_add(widx as u64));
+        if inst.check_state {
+            owner.fill(-1);
+            for nid in 0..nn {
+                commit(&mut owner, nid, &sol.verts[nid]);
+            }
+            assert_consistent_state(&inst, &sol, &owner);
+        }
+        let mut best = shared.lock().unwrap();
+        if sol.total < best.total
+            || (retain_compact_best
+                && sol.total == best.total
+                && best.sol.as_ref().is_some_and(|s| sol.vcount < s.vcount))
+        {
+            println!(
+                "FINAL_WALK before_best={} after={} gain={}",
+                best.total,
+                sol.total,
+                best.total - sol.total
+            );
+            best.total = sol.total;
+            best.sol = Some(sol.clone());
+            best.gen += 1;
+        }
+    }
+    if dump_final && widx == 0 {
+        let _ = write_sol(&inst, &sol, &out_path);
+    }
+    println!(
+        "[{}#{}] DONE trials={} eq={} rej={} imp={} up={} neg={} inapp={} best={} (delta {}) pexp={} pint={} hcalc={} cbp={} ccp={} chain_complete={} chain_polish_queries={} chain_polish_changed={} chain_polish_recovered={} chain_polish_savings={} chain_polish_strict_gains={}",
+        tag,
+        widx,
+        trials,
+        eq,
+        rejected,
+        imp,
+        uphill,
+        neg_trials,
+        inapp,
+        local_best_total,
+        local_best_total as i64 - init.total as i64,
+        ws.pen_expanded,
+        ws.pen_integer_calls,
+        ws.pen_h_evaluations,
+        ws.cbs_bypasses,
+        ws.cbs_priority_probes,
+        chain_polish_stats.complete_chains,
+        chain_polish_stats.exact_queries,
+        chain_polish_stats.changed_chains,
+        chain_polish_stats.recovered_acceptances,
+        chain_polish_stats.physical_savings,
+        chain_polish_stats.accepted_strict_gains
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn chain_polish_recovers_rejected_candidate_and_rollback_restores_all_owners() {
+        let mut inst = Inst {
+            early_stop: true,
+            retain_negotiated: false,
+            use_radix: true,
+            use_dial: true,
+            use_astar: true,
+            budget_bound: false,
+            free_dist: Vec::new(),
+            check_state: true,
+            name: "chain-polish-recovery".into(),
+            w: 3,
+            h: 3,
+            l: 1,
+            wh: 9,
+            n: 9,
+            ld: vec![1],
+            vd: 1,
+            nets: vec![
+                Net {
+                    driver: 0,
+                    sinks: vec![2],
+                },
+                Net {
+                    driver: 6,
+                    sinks: vec![8],
+                },
+            ],
+            pin_owner: vec![-1; 9],
+        };
+        for (nid, net) in inst.nets.iter().enumerate() {
+            for &v in std::iter::once(&net.driver).chain(net.sinks.iter()) {
+                inst.pin_owner[v as usize] = nid as i32;
+            }
+        }
+        inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+
+        let original = Saved {
+            nid: 0,
+            verts: vec![0, 1, 2],
+            edges: vec![canon(0, 1), canon(1, 2)],
+            delay: 2,
+        };
+        let mut proposals = vec![(
+            vec![0, 2, 3, 4, 5],
+            vec![canon(0, 3), canon(3, 4), canon(4, 5), canon(2, 5)],
+            4,
+        )];
+        let mut owner = vec![-1; 9];
+        commit(&mut owner, 0, &proposals[0].0);
+        let outsider = vec![6, 7, 8];
+        commit(&mut owner, 1, &outsider);
+        let owner_before_chain = {
+            let mut expected = vec![-1; 9];
+            commit(&mut expected, 0, &original.verts);
+            commit(&mut expected, 1, &outsider);
+            expected
+        };
+
+        let proposed_sum = proposals[0].2;
+        assert!(proposed_sum as i64 - original.delay as i64 > 0);
+        let mut stats = ChainPolishStats::default();
+        let mut ws = Scratch::new(inst.n, inst.nets.len(), 17);
+        let changed = polish_chain_proposals(
+            &inst,
+            &mut owner,
+            &mut ws,
+            &[original.clone()],
+            &mut proposals,
+            &mut stats,
+        );
+        assert!(changed);
+        assert_eq!(proposals[0].2, original.delay);
+        assert!(proposals[0].2 as i64 - original.delay as i64 <= 0);
+        assert!(stats.exact_queries >= 1);
+        assert_eq!(&owner[6..], &owner_before_chain[6..]);
+        assert_eq!(owner[0], 0);
+        assert_eq!(owner[1], 0);
+        assert_eq!(owner[2], 0);
+
+        // A later aggregate rejection must restore the byte-identical saved
+        // geometry and preserve every unrelated owner.
+        restore_chain(&mut owner, &[original], &proposals);
+        assert_eq!(owner, owner_before_chain);
+    }
+
+    #[test]
+    fn stable_extraction_matches_first_discovery_dijkstra() {
+        let (mut feasible, mut infeasible) = (0, 0);
+        for seed in 0..128 {
+            let mut rng = Rng::new(seed);
+            let mut inst = Inst {
+                early_stop: false,
+                retain_negotiated: false,
+                use_radix: false,
+                use_dial: false,
+                use_astar: false,
+                budget_bound: false,
+                free_dist: Vec::new(),
+                check_state: false,
+                name: "stable-oracle".into(),
+                w: 4,
+                h: 4,
+                l: 2,
+                wh: 16,
+                n: 32,
+                ld: vec![1 + rng.below(5) as u32, 1 + rng.below(5) as u32],
+                vd: 1 + rng.below(4) as u32,
+                nets: vec![
+                    Net {
+                        driver: 0,
+                        sinks: vec![3, 15, 31],
+                    },
+                    Net {
+                        driver: 12,
+                        sinks: vec![28],
+                    },
+                ],
+                pin_owner: vec![-1; 32],
+            };
+            for (nid, net) in inst.nets.iter().enumerate() {
+                for &v in std::iter::once(&net.driver).chain(net.sinks.iter()) {
+                    inst.pin_owner[v as usize] = nid as i32;
+                }
+            }
+            inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+            let mut owner = vec![-1; 32];
+            for v in 0..32 {
+                if seed > 1 && inst.pin_owner[v] < 0 && rng.below(5) == 0 {
+                    owner[v] = 1;
+                }
+            }
+            if seed == 0 {
+                for v in [1, 4, 16] {
+                    owner[v] = 1;
+                }
+            }
+            // Independent reference: ordinary heap Dijkstra stores the first
+            // predecessor and does not replace it on an equal-distance visit.
+            let mut distance = vec![INF; 32];
+            let mut parent = vec![0u32; 32];
+            distance[0] = 0;
+            let mut queue = BinaryHeap::from([Reverse((0u32, 0u32))]);
+            let mut nb = [0; 6];
+            let mut wb = [0; 6];
+            while let Some(Reverse((d, u))) = queue.pop() {
+                if distance[u as usize] != d {
+                    continue;
+                }
+                let count = inst.neigh(u, &mut nb, &mut wb);
+                for i in 0..count {
+                    let v = nb[i] as usize;
+                    if owner[v] >= 0 || (inst.pin_owner[v] >= 0 && inst.pin_owner[v] != 0) {
+                        continue;
+                    }
+                    let nd = d + wb[i];
+                    if nd < distance[v] {
+                        distance[v] = nd;
+                        parent[v] = u;
+                        queue.push(Reverse((nd, v as u32)));
+                    }
+                }
+            }
+            let expected = if inst.nets[0]
+                .sinks
+                .iter()
+                .any(|&s| distance[s as usize] == INF)
+            {
+                infeasible += 1;
+                None
+            } else {
+                feasible += 1;
+                let mut edges = Vec::new();
+                for &sink in &inst.nets[0].sinks {
+                    let mut v = sink;
+                    while v != 0 {
+                        let u = parent[v as usize];
+                        edges.push(canon(u, v));
+                        v = u;
+                    }
+                }
+                edges.sort_unstable();
+                edges.dedup();
+                let mut vertices = vec![0];
+                vertices.extend(edges.iter().flat_map(|&(u, v)| [u, v]));
+                vertices.sort_unstable();
+                vertices.dedup();
+                Some((
+                    vertices,
+                    edges,
+                    inst.nets[0]
+                        .sinks
+                        .iter()
+                        .map(|&s| distance[s as usize] as u64)
+                        .sum::<u64>(),
+                ))
+            };
+            for fast in [false, true] {
+                inst.early_stop = fast;
+                inst.use_astar = fast;
+                inst.use_radix = fast;
+                inst.use_dial = fast;
+                let mut ws = Scratch::new(32, 2, 999);
+                ws.dijkstra(&inst, &owner, 0, 0, false, u32::MAX);
+                assert_eq!(
+                    ws.extract_stable(&inst, &inst.nets[0]),
+                    expected,
+                    "seed={seed} fast={fast}"
+                );
+            }
+        }
+        assert!(feasible > 0 && infeasible > 0);
+    }
+
+    #[test]
+    fn stable_polish_preserves_ownership_and_improves_branching_fixture() {
+        let mut inst = Inst {
+            early_stop: true,
+            retain_negotiated: false,
+            use_radix: true,
+            use_dial: true,
+            use_astar: true,
+            budget_bound: false,
+            free_dist: Vec::new(),
+            check_state: true,
+            name: "stable-polish".into(),
+            w: 3,
+            h: 3,
+            l: 1,
+            wh: 9,
+            n: 9,
+            ld: vec![1],
+            vd: 2,
+            nets: vec![
+                Net {
+                    driver: 0,
+                    sinks: vec![2, 8],
+                },
+                Net {
+                    driver: 6,
+                    sinks: vec![3],
+                },
+            ],
+            pin_owner: vec![0, -1, 0, 1, -1, -1, 1, -1, 0],
+        };
+        inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+        let mut sol = Solution {
+            verts: vec![vec![0, 1, 2, 4, 5, 8], vec![3, 6]],
+            edges: vec![vec![(0, 1), (1, 4), (4, 5), (2, 5), (5, 8)], vec![(3, 6)]],
+            delay: vec![8, 1],
+            total: 9,
+            vcount: 8,
+        };
+        let original = sol.edges.clone();
+        let original_solution = sol.clone();
+        stable_polish(&inst, &mut sol, 0);
+        assert_eq!(sol.edges, original);
+        stable_polish(&inst, &mut sol, 2);
+        assert_eq!(sol.total, 7);
+        for reverse_vertices in [false, true] {
+            for reverse_nets in [false, true] {
+                let mut candidate = original_solution.clone();
+                stable_polish_order(&inst, &mut candidate, 2, reverse_vertices, reverse_nets);
+                assert_eq!(candidate.total, 7);
+                assert_eq!(candidate.edges[1], vec![(3, 6)]);
+            }
+        }
+        assert_eq!(sol.delay, vec![6, 1]);
+        assert_eq!(sol.edges[1], vec![(3, 6)]);
+        stable_polish(&inst, &mut sol, 2);
+        assert_eq!(sol.total, 7);
+    }
+
+    #[test]
+    fn compact_polish_reduces_neutral_footprint_and_keeps_other_tree() {
+        let mut inst = Inst {
+            early_stop: true,
+            retain_negotiated: false,
+            use_radix: true,
+            use_dial: true,
+            use_astar: true,
+            budget_bound: true,
+            free_dist: Vec::new(),
+            check_state: true,
+            name: "compact-polish".into(),
+            w: 5,
+            h: 5,
+            l: 2,
+            wh: 25,
+            n: 50,
+            ld: vec![1, 1],
+            vd: 2,
+            nets: vec![
+                Net {
+                    driver: 0,
+                    sinks: vec![4, 9],
+                },
+                Net {
+                    driver: 20,
+                    sinks: vec![24],
+                },
+            ],
+            pin_owner: vec![-1; 50],
+        };
+        for (i, net) in inst.nets.iter().enumerate() {
+            for &p in std::iter::once(&net.driver).chain(net.sinks.iter()) {
+                inst.pin_owner[p as usize] = i as i32;
+            }
+        }
+        inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+        let outside = vec![(20, 21), (21, 22), (22, 23), (23, 24)];
+        let mut sol = Solution {
+            verts: vec![(0..10).collect(), (20..25).collect()],
+            edges: vec![
+                vec![
+                    (0, 1),
+                    (1, 2),
+                    (2, 3),
+                    (3, 4),
+                    (0, 5),
+                    (5, 6),
+                    (6, 7),
+                    (7, 8),
+                    (8, 9),
+                ],
+                outside.clone(),
+            ],
+            delay: vec![9, 4],
+            total: 13,
+            vcount: 15,
+        };
+        compact_polish(&inst, &mut sol, 7, 4);
+        assert_eq!((sol.total, sol.vcount), (13, 11));
+        assert_eq!(sol.edges[1], outside);
+        let stable = sol.edges.clone();
+        compact_polish(&inst, &mut sol, 91, 4);
+        assert_eq!(sol.edges, stable);
+        let mut owner = vec![-1; 50];
+        for nid in 0..2 {
+            commit(&mut owner, nid, &sol.verts[nid]);
+        }
+        assert_consistent_state(&inst, &sol, &owner);
+    }
+    // Differential tests include unreachable sinks, foreign pins, blocked
+    // vertices, multi-sink sharing, unequal layer weights and congestion prices.
+    #[test]
+    fn early_stop_preserves_physical_and_penalized_trees() {
+        for seed in 1..=200 {
+            let mut rng = Rng::new(seed);
+            let w = 4 + rng.below(5) as u32;
+            let h = 4 + rng.below(5) as u32;
+            let l = 1 + rng.below(4) as u32;
+            let n = w * h * l;
+            let mut sinks = vec![n - 1, n / 2, n / 3];
+            sinks.sort_unstable();
+            sinks.dedup();
+            let mut pins = vec![-1; n as usize];
+            pins[0] = 0;
+            for &s in &sinks {
+                pins[s as usize] = 0;
+            }
+            let mut owner = vec![-1; n as usize];
+            for v in 1..n {
+                if pins[v as usize] < 0 {
+                    if rng.below(7) == 0 {
+                        owner[v as usize] = 1;
+                    }
+                    if rng.below(19) == 0 {
+                        pins[v as usize] = 1;
+                    }
+                }
+            }
+            let mut inst = Inst {
+                early_stop: false,
+                retain_negotiated: false,
+                use_radix: false,
+                use_dial: false,
+                use_astar: true,
+                budget_bound: false,
+                free_dist: Vec::new(),
+                check_state: false,
+                name: "differential".into(),
+                w,
+                h,
+                l,
+                wh: w * h,
+                n,
+                ld: (0..l).map(|_| 1 + rng.below(9) as u32).collect(),
+                vd: 1 + rng.below(6) as u32,
+                nets: vec![Net { driver: 0, sinks }],
+                pin_owner: pins,
+            };
+            inst.free_dist = free_space_table(w, h, l, &inst.ld, inst.vd);
+            let mut full = Scratch::new(n, 1, seed);
+            let mut fast = Scratch::new(n, 1, seed);
+            full.dijkstra(&inst, &owner, 0, 0, false, u32::MAX);
+            let a = full.extract(&inst, &inst.nets[0]);
+            inst.early_stop = true;
+            inst.use_radix = true;
+            fast.dijkstra(&inst, &owner, 0, 0, false, u32::MAX);
+            let b = fast.extract(&inst, &inst.nets[0]);
+            assert_eq!(a, b, "physical seed {}", seed);
+            inst.use_dial = true;
+            for astar in [false, true] {
+                inst.use_astar = astar;
+                let mut dial = Scratch::new(n, 1, seed);
+                dial.dijkstra(&inst, &owner, 0, 0, false, u32::MAX);
+                assert_eq!(
+                    a,
+                    dial.extract(&inst, &inst.nets[0]),
+                    "Dial physical seed {} astar {}",
+                    seed,
+                    astar
+                );
+            }
+            inst.use_astar = true;
+            inst.use_dial = false;
+            if a.is_some() {
+                for slack in [0, 7, 100] {
+                    let budgets: Vec<_> = inst.nets[0]
+                        .sinks
+                        .iter()
+                        .map(|&s| fast.dist[s as usize] + slack)
+                        .collect();
+                    let mut bounded = Scratch::new(n, 1, seed);
+                    bounded.dijkstra_bounded(&inst, &owner, 0, &budgets, false);
+                    assert_eq!(
+                        a,
+                        bounded.extract(&inst, &inst.nets[0]),
+                        "per-sink budget seed {} slack {}",
+                        seed,
+                        slack
+                    );
+                    inst.use_dial = true;
+                    let mut dial = Scratch::new(n, 1, seed);
+                    dial.dijkstra_bounded(&inst, &owner, 0, &budgets, false);
+                    assert_eq!(
+                        a,
+                        dial.extract(&inst, &inst.nets[0]),
+                        "Dial bounded seed {} slack {}",
+                        seed,
+                        slack
+                    );
+                    inst.use_dial = false;
+                }
+            }
+            for ws in [&mut full, &mut fast] {
+                ws.ncur = 1;
+            }
+            for v in 0..n as usize {
+                let count = rng.below(4) as u32;
+                let hist = rng.below(8) as f64 * 0.5;
+                for ws in [&mut full, &mut fast] {
+                    ws.pvst[v] = 1;
+                    ws.pcv[v] = count;
+                    ws.phv[v] = hist;
+                }
+            }
+            inst.early_stop = false;
+            full.pdijkstra(&inst, &owner, &[false, false], 0, 0, 0.5, 1.0);
+            let a = full.extract_pen(&inst, &inst.nets[0], 0.5, 1.0);
+            inst.early_stop = true;
+            fast.pdijkstra(&inst, &owner, &[false, false], 0, 0, 0.5, 1.0);
+            let b = fast.extract_pen(&inst, &inst.nets[0], 0.5, 1.0);
+            assert_eq!(a, b, "penalized seed {}", seed);
+            for cut in [2, 7, 14, 30] {
+                let mut full = Scratch::new(n, 1, seed);
+                let mut fast = Scratch::new(n, 1, seed);
+                inst.early_stop = false;
+                inst.use_radix = false;
+                full.dijkstra(&inst, &owner, 0, 0, false, cut);
+                let a = full.extract(&inst, &inst.nets[0]);
+                inst.early_stop = true;
+                inst.use_radix = true;
+                fast.dijkstra(&inst, &owner, 0, 0, false, cut);
+                let b = fast.extract(&inst, &inst.nets[0]);
+                assert_eq!(a, b, "bounded seed {} cutoff {}", seed, cut);
+                inst.use_dial = true;
+                let mut dial = Scratch::new(n, 1, seed);
+                dial.dijkstra(&inst, &owner, 0, 0, false, cut);
+                assert_eq!(
+                    a,
+                    dial.extract(&inst, &inst.nets[0]),
+                    "Dial cutoff seed {} cutoff {}",
+                    seed,
+                    cut
+                );
+                inst.use_dial = false;
+            }
+        }
+    }
+    #[test]
+    fn entry_pricing_matches_independent_dense_dijkstra() {
+        for seed in 1..=40 {
+            let mut rng = Rng::new(seed);
+            let w = 5;
+            let h = 4;
+            let l = 2;
+            let n = w * h * l;
+            let mut pins = vec![-1; n as usize];
+            pins[0] = 0;
+            pins[(n - 1) as usize] = 0;
+            let inst = Inst {
+                early_stop: false,
+                retain_negotiated: false,
+                use_radix: true,
+                use_dial: false,
+                use_astar: true,
+                budget_bound: false,
+                free_dist: Vec::new(),
+                check_state: false,
+                name: "entry-price".into(),
+                w,
+                h,
+                l,
+                wh: w * h,
+                n,
+                ld: vec![1, 3],
+                vd: 2,
+                nets: vec![Net {
+                    driver: 0,
+                    sinks: vec![n - 1],
+                }],
+                pin_owner: pins,
+            };
+            let mut owner = vec![-1; n as usize];
+            for v in 1..n - 1 {
+                if rng.below(3) > 0 {
+                    owner[v as usize] = 1 + rng.below(2) as i32;
+                }
+            }
+            let mut ws = Scratch::new(n, 1, seed);
+            ws.entry_owner = owner.clone();
+            ws.ncur = 1;
+            for v in 0..n as usize {
+                if owner[v] >= 0 {
+                    ws.pvst[v] = 1;
+                    ws.pcv[v] = 1;
+                    ws.phv[v] = 0.0;
+                }
+            }
+            ws.pdijkstra(&inst, &owner, &[true, true, true], 0, 0, 2.0, 1.0);
+            let mut reference = vec![u64::MAX; n as usize];
+            let mut done = vec![false; n as usize];
+            reference[0] = 0;
+            let mut nb = [0; 6];
+            let mut weights = [0; 6];
+            for _ in 0..n {
+                let v = (0..n as usize)
+                    .filter(|&v| !done[v])
+                    .min_by_key(|&v| reference[v])
+                    .unwrap();
+                done[v] = true;
+                let k = inst.neigh(v as u32, &mut nb, &mut weights);
+                for j in 0..k {
+                    let u = nb[j] as usize;
+                    let penalty = if owner[u] >= 0 && owner[u] != owner[v] {
+                        2
+                    } else {
+                        0
+                    };
+                    reference[u] = reference[u].min(reference[v] + weights[j] as u64 + penalty);
+                }
+            }
+            for v in 0..n as usize {
+                assert_eq!(
+                    ws.pdist[v], reference[v] as f64,
+                    "entry-price seed {} vertex {}",
+                    seed, v
+                );
+            }
+            assert!(ws.extract_pen(&inst, &inst.nets[0], 2.0, 1.0).is_some());
+        }
+    }
+
+    #[test]
+    fn penalized_astar_matches_full_search_with_history_and_foreign_pins() {
+        for seed in 1..=80 {
+            let mut rng = Rng::new(seed);
+            let n = 60;
+            let mut inst = Inst {
+                early_stop: false,
+                retain_negotiated: false,
+                use_radix: true,
+                use_dial: false,
+                use_astar: true,
+                budget_bound: false,
+                free_dist: Vec::new(),
+                check_state: false,
+                name: "pen-astar".into(),
+                w: 5,
+                h: 4,
+                l: 3,
+                wh: 20,
+                n: n as u32,
+                ld: vec![1, 3, 2],
+                vd: 2,
+                nets: vec![Net {
+                    driver: 0,
+                    sinks: vec![19, 39, 59],
+                }],
+                pin_owner: vec![-1; n],
+            };
+            for p in [0, 19, 39, 59] {
+                inst.pin_owner[p] = 0;
+            }
+            inst.pin_owner[4] = 2;
+            let mut owner = vec![-1; n];
+            for v in 1..n {
+                if inst.pin_owner[v] < 0 {
+                    owner[v] = match rng.below(8) {
+                        0 => 2,
+                        1..=4 => 1,
+                        _ => -1,
+                    };
+                }
+            }
+            let mut full = Scratch::new(n as u32, 3, seed);
+            let mut fast = Scratch::new(n as u32, 3, seed);
+            let mut nb = [0; 6];
+            let mut wb = [0; 6];
+            for ws in [&mut full, &mut fast] {
+                ws.ncur = 1;
+                if seed % 2 == 0 {
+                    ws.entry_owner = owner.clone();
+                }
+                for v in 0..n {
+                    ws.pvst[v] = 1;
+                    ws.pcv[v] = (v % 3) as u32;
+                    ws.phv[v] = (v % 5) as f64 * 0.1;
+                    let k = inst.neigh(v as u32, &mut nb, &mut wb);
+                    for &u in &nb[..k] {
+                        if v as u32 >= u {
+                            continue;
+                        }
+                        let key = ekey(v as u32, u);
+                        ws.pce.insert(key, (key % 3) as u32);
+                        ws.phe.insert(key, (key % 7) as f64 * 0.1);
+                    }
+                }
+            }
+            let price = if seed % 2 == 0 { 0.3 } else { 1.7 };
+            full.pdijkstra(&inst, &owner, &[true, true, false], 0, 0, price, 0.7);
+            inst.early_stop = true;
+            fast.penalized_astar = true;
+            fast.penalized_heuristic_cache = true;
+            fast.pdijkstra(&inst, &owner, &[true, true, false], 0, 0, price, 0.7);
+            for &sink in &inst.nets[0].sinks {
+                assert_eq!(
+                    full.pstamp[sink as usize] == full.pcur,
+                    fast.pstamp[sink as usize] == fast.pcur
+                );
+                if full.pstamp[sink as usize] == full.pcur {
+                    assert!((full.pdist[sink as usize] - fast.pdist[sink as usize]).abs() < 1e-9);
+                }
+            }
+            let a = full.extract_pen_with_owner(&inst, &inst.nets[0], price, 0.7, Some(&owner));
+            let b = fast.extract_pen_with_owner(&inst, &inst.nets[0], price, 0.7, Some(&owner));
+            assert_eq!(a.is_some(), b.is_some(), "seed {seed}");
+            if let Some((verts, edges)) = b {
+                assert_eq!(verts.len(), edges.len() + 1);
+                assert!(!verts.contains(&4));
+                assert!(verts.iter().all(|&v| owner[v as usize] != 2));
+            }
+        }
+    }
+    #[test]
+    fn tree_objective_charges_shared_trunk_for_each_sink() {
+        let inst = Inst {
+            early_stop: true,
+            retain_negotiated: true,
+            use_radix: true,
+            use_dial: false,
+            use_astar: true,
+            budget_bound: false,
+            free_dist: Vec::new(),
+            check_state: false,
+            name: "trunk".into(),
+            w: 3,
+            h: 2,
+            l: 1,
+            wh: 6,
+            n: 6,
+            ld: vec![2],
+            vd: 3,
+            nets: vec![Net {
+                driver: 0,
+                sinks: vec![2, 4],
+            }],
+            pin_owner: vec![0, -1, 0, -1, 0, -1],
+        };
+        assert_eq!(physical_tree_delay(&inst, 0, &[(0, 1), (1, 2), (1, 4)]), 8);
+    }
+
+    #[test]
+    fn direct_chain_prices_match_materialized_costs() {
+        for seed in 1..=40 {
+            for entry in [false, true] {
+                let mut rng = Rng::new(seed);
+                let n = 100;
+                let mut pins = vec![-1; n];
+                pins[0] = 0;
+                pins[n - 1] = 0;
+                pins[n / 2] = 0;
+                let inst = Inst {
+                    early_stop: true,
+                    retain_negotiated: false,
+                    use_radix: true,
+                    use_dial: true,
+                    use_astar: true,
+                    budget_bound: false,
+                    free_dist: Vec::new(),
+                    check_state: false,
+                    name: "direct-chain".into(),
+                    w: 5,
+                    h: 5,
+                    l: 4,
+                    wh: 25,
+                    n: n as u32,
+                    ld: vec![1, 3, 2, 4],
+                    vd: 2,
+                    nets: vec![Net {
+                        driver: 0,
+                        sinks: vec![(n - 1) as u32, (n / 2) as u32],
+                    }],
+                    pin_owner: pins,
+                };
+                let mut owner = vec![-1; n];
+                for v in 1..n {
+                    if rng.below(3) > 0 {
+                        owner[v] = 1 + rng.below(2) as i32;
+                    }
+                }
+                let mut legacy = Scratch::new(n as u32, 3, seed);
+                let mut direct = Scratch::new(n as u32, 3, seed);
+                legacy.ncur = 1;
+                direct.ncur = 1;
+                if entry {
+                    legacy.entry_owner = owner.clone();
+                }
+                for v in 0..n {
+                    if owner[v] >= 0 {
+                        legacy.pvst[v] = 1;
+                        legacy.pcv[v] = 1;
+                    }
+                }
+                direct.direct_chain_prices = Some(entry);
+                let price = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0][seed as usize % 6];
+                legacy.pdijkstra(&inst, &owner, &[true, true, true], 0, 0, price, 1.0);
+                direct.pdijkstra(&inst, &owner, &[true, true, true], 0, 0, price, 1.0);
+                assert_eq!(legacy.pstamp, direct.pstamp);
+                assert_eq!(legacy.pdist, direct.pdist);
+                assert_eq!(
+                    legacy.extract_pen(&inst, &inst.nets[0], price, 1.0),
+                    direct.extract_pen_with_owner(&inst, &inst.nets[0], price, 1.0, Some(&owner))
+                );
+                for queue_astar in [false, true] {
+                    // Cover Dial, its wide-cost radix fallback, non-quarter
+                    // floating costs, a u32-overflow bound and non-unit scaling.
+                    for (queue_price, vcong) in [
+                        (price, 1.0),
+                        (0.3, 1.0),
+                        (2048.0, 1.0),
+                        (1e9, 1.0),
+                        (0.5, 0.3),
+                    ] {
+                        let mut heap = Scratch::new(n as u32, 3, seed);
+                        let mut integer = Scratch::new(n as u32, 3, seed);
+                        for ws in [&mut heap, &mut integer] {
+                            ws.direct_chain_prices = Some(entry);
+                            ws.penalized_astar = queue_astar;
+                        }
+                        integer.penalized_integer_queue = true;
+                        integer.penalized_heuristic_cache = true;
+                        heap.pdijkstra(
+                            &inst,
+                            &owner,
+                            &[true, true, true],
+                            0,
+                            0,
+                            queue_price,
+                            vcong,
+                        );
+                        integer.pdijkstra(
+                            &inst,
+                            &owner,
+                            &[true, true, true],
+                            0,
+                            0,
+                            queue_price,
+                            vcong,
+                        );
+                        let uses_integer = vcong == 1.0 && queue_price != 0.3 && queue_price != 1e9;
+                        assert_eq!(integer.pen_integer_calls, uses_integer as u64);
+                        for &sink in &inst.nets[0].sinks {
+                            assert_eq!(heap.pdist[sink as usize], integer.pdist[sink as usize]);
+                        }
+                        assert_eq!(
+                            heap.extract_pen_with_owner(&inst, &inst.nets[0], queue_price, vcong, Some(&owner)),
+                            integer.extract_pen_with_owner(&inst, &inst.nets[0], queue_price, vcong, Some(&owner)),
+                            "queue seed={seed} entry={entry} astar={queue_astar} price={queue_price} vcong={vcong}"
+                        );
+                    }
+                }
+                let mut astar = Scratch::new(n as u32, 3, seed);
+                astar.direct_chain_prices = Some(entry);
+                astar.penalized_astar = true;
+                astar.pdijkstra(&inst, &owner, &[true, true, true], 0, 0, price, 1.0);
+                for &sink in &inst.nets[0].sinks {
+                    assert!(
+                        (astar.pdist[sink as usize] - legacy.pdist[sink as usize]).abs() < 1e-9
+                    );
+                }
+                let (_, edges) = astar
+                    .extract_pen_with_owner(&inst, &inst.nets[0], price, 1.0, Some(&owner))
+                    .unwrap();
+                let mut adj = vec![Vec::new(); n];
+                for (u, v) in edges {
+                    adj[u as usize].push(v);
+                    adj[v as usize].push(u);
+                }
+                let mut distances = vec![f64::INFINITY; n];
+                distances[0] = 0.0;
+                let mut pending = vec![0usize];
+                while let Some(u) = pending.pop() {
+                    for &v in &adj[u] {
+                        let vi = v as usize;
+                        if distances[vi].is_finite() {
+                            continue;
+                        }
+                        let extra = if owner[vi] >= 0 && (!entry || owner[vi] != owner[u]) {
+                            price
+                        } else {
+                            0.0
+                        };
+                        distances[vi] =
+                            distances[u] + edge_w(&inst, u as u32, v).unwrap() as f64 + extra;
+                        pending.push(vi);
+                    }
+                }
+                for &sink in &inst.nets[0].sinks {
+                    assert!((distances[sink as usize] - legacy.pdist[sink as usize]).abs() < 1e-9);
+                }
+            }
+        }
+    }
+
+    // Authored integration regression copied from the public owner-set source
+    // contract: compare bounded bidirectional owner labels with an independent
+    // exhaustive product-graph oracle on a 3x3x1 grid.
+    fn r8_owner_label_oracle_fixture() -> (Inst, Vec<i32>) {
+        let mut inst = Inst {
+            early_stop: true,
+            retain_negotiated: false,
+            use_radix: true,
+            use_dial: true,
+            use_astar: true,
+            budget_bound: false,
+            free_dist: Vec::new(),
+            check_state: false,
+            name: "r8-owner-set-label-oracle".into(),
+            w: 3, h: 3, l: 1, wh: 9, n: 9,
+            ld: vec![1], vd: 1,
+            nets: vec![
+                Net { driver: 0, sinks: vec![8] },
+                Net { driver: 0, sinks: Vec::new() },
+                Net { driver: 0, sinks: Vec::new() },
+            ],
+            pin_owner: vec![-1; 9],
+        };
+        inst.pin_owner[0] = 0;
+        inst.pin_owner[8] = 0;
+        inst.free_dist = free_space_table(inst.w, inst.h, inst.l, &inst.ld, inst.vd);
+        let mut owner = vec![-1; 9];
+        owner[4] = 1;
+        owner[2] = 2;
+        (inst, owner)
+    }
+
+    fn r8_owner_set_product_oracle(
+        inst: &Inst, owner: &[i32], seed: usize, sink: u32, blocker_ids: &[usize],
+    ) -> Vec<(u64, Vec<usize>)> {
+        let masks = 1usize << blocker_ids.len();
+        let state_count = inst.n as usize * masks;
+        let index = |v: u32, mask: usize| v as usize * masks + mask;
+        let mut dist = vec![u64::MAX; state_count];
+        dist[index(inst.nets[seed].driver, 0)] = 0;
+        let mut neighbors = [0u32; 6];
+        let mut weights = [0u32; 6];
+        for _ in 0..state_count {
+            let mut changed = false;
+            for v in 0..inst.n {
+                for mask in 0..masks {
+                    let d = dist[index(v, mask)];
+                    if d == u64::MAX { continue; }
+                    let count = inst.neigh(v, &mut neighbors, &mut weights);
+                    for i in 0..count {
+                        let next = neighbors[i];
+                        let pin = inst.pin_owner[next as usize];
+                        if pin >= 0 && pin != seed as i32 { continue; }
+                        let mut next_mask = mask;
+                        let occupied = owner[next as usize];
+                        if occupied >= 0 && occupied != seed as i32 {
+                            let Some(bit) = blocker_ids.iter().position(|&id| id == occupied as usize) else { continue; };
+                            next_mask |= 1usize << bit;
+                        }
+                        let next_index = index(next, next_mask);
+                        let candidate = d + weights[i] as u64;
+                        if candidate < dist[next_index] { dist[next_index] = candidate; changed = true; }
+                    }
+                }
+            }
+            if !changed { break; }
+        }
+        let mut result = Vec::new();
+        for mask in 0..masks {
+            let d = dist[index(sink, mask)];
+            if d == u64::MAX { continue; }
+            let ids = blocker_ids.iter().enumerate()
+                .filter_map(|(bit, &id)| if mask & (1 << bit) != 0 { Some(id) } else { None })
+                .collect();
+            result.push((d, ids));
+        }
+        result.sort_unstable();
+        result
+    }
+
+    #[test]
+    fn r8_owner_labels_match_independent_product_graph_oracle_and_hard_pins() {
+        let (inst, owner) = r8_owner_label_oracle_fixture();
+        let got = owner_set_sink_labels(&inst, &owner, 0, 8, u32::MAX, 2, 50_000, 50_000, 8);
+        assert!(!got.truncated);
+        assert!(got.join_probes <= 8 * got.labels_pushed);
+        assert_eq!(got.sink_labels, r8_owner_set_product_oracle(&inst, &owner, 0, 8, &[1, 2]));
+
+        let mut pinned = inst;
+        let mut pinned_owner = owner;
+        pinned.pin_owner[4] = 1;
+        pinned_owner[4] = 1;
+        let hard = owner_set_sink_labels(&pinned, &pinned_owner, 0, 8, u32::MAX, 2, 50_000, 50_000, 8);
+        assert!(hard.sink_labels.iter().all(|(_, ids)| !ids.contains(&1)));
+        assert!(hard.sink_labels.contains(&(4, Vec::new())));
+        let capped = owner_set_sink_labels(&pinned, &pinned_owner, 0, 8, u32::MAX, 2, 1, 50_000, 8);
+        assert!(capped.truncated);
+    }
+
+}

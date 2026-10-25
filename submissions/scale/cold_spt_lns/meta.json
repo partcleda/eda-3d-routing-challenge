@@ -1,0 +1,16 @@
+{
+  "author": "kesudh",
+  "url": "https://github.com/kesudh/eda-3d-routing-challenge/tree/codex/independent-cold-spt/submissions/intro/cold_spt_lns",
+  "date": "2026-10-22",
+  "method": "Independent cold construction from benchmark pins; versioned root-distance trees, fanout-aware congestion negotiation, exact per-net descent, fixed-work LNS, joint candidate selection and displacement chains. Every intermediate route is generated inside the same invocation. Each case records its actual producing source, seed and work counts.",
+  "hardware": "Intel Core i7-13700HX (16C/24T), 31.7 GiB RAM, Windows 11",
+  "threads": 1,
+  "independent": true,
+  "route_inputs": "Benchmark instance JSON only. All intermediate geometry is constructed in this invocation; no published routes, reference solutions, prior-entry routes or trained geometry artifacts.",
+  "runtime_scope": "One complete solver process per case, including input parsing, cold construction, every internal refinement/portfolio phase, output serialization and process exit. Excludes compilation, pre-run instance copying and post-run official checking. Actual producing runs and times are retained when experiments do not improve them.",
+  "reproduce": "python submissions/intro/cold_spt_lns/run.py --reproduce --tier scale",
+  "run_records": "runs.json",
+  "source": "reproducers/<runs.json source_version>/router/src/main.rs under the shared intro entry",
+  "algorithm_credit": "Search code adapted from kesudh earlier Rust engine; no geometry reused. Standard SPT, negotiated congestion and LNS; conflict splitting adapted from Sharon et al. Fanout-aware pricing and joint candidate selection informed by PathFinder/FastRoute literature and the public IrwinJam/m3d-router. New code independently implemented; no opponent code or routes copied.",
+  "configuration_policy": "Each case runs.json solver_args and immutable source_version determine its exact producing configuration; CLI defaults do not replace those records."
+}
