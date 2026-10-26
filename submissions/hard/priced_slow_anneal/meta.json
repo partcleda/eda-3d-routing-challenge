@@ -1,0 +1,8 @@
+{
+ "author": "Luke Blommesteyn (lblommesteyn) and Saksham Batra (sakshambatra1)",
+ "url": "https://github.com/lblommesteyn/eda-3d-routing-challenge/tree/priced-slow-anneal/routers/priced_cpp",
+ "method": "Saksham Batra's priced_cpp C++ engine: negotiated congestion routing from scratch, then one long single-schedule simulated anneal (T0 20, no reheat cycles, 2-6 h) with exact per-net tree re-optimization; best seed per case. No routes from other entries.",
+ "date": "2026-10-26",
+ "hardware": "AMD Ryzen 7 5800X (8 cores / 16 threads), 48 GB RAM, Windows 11 + WSL2; one case per worker, up to 16 workers at once",
+ "threads": 1
+}
