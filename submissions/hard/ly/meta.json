@@ -1,6 +1,8 @@
 {
  "author": "ly",
- "url": "https://github.com/you/your-router (optional)",
- "method": "first give more weight to the nets that benefited more from middle layers, and use negotiated router with the weight, and then reroute within net,  in pairs, and then in groups for marginal gain. Repeat the rerouting.",
- "date": "2026-10-01"
+ "url": "",
+ "method": "Mainly SA: first use Partcl's negotiated router with a middle-layer yield price for low-benefit nets, then ruin-and-recreate for individual net with SA (reheat when stuck), then some final polish.",
+ "date": "2026-10-25",
+ "hardware": "Apple M3, 16 GB RAM (MacBook Air), x86_64 Python under Rosetta 2",
+ "threads": 1
 }
