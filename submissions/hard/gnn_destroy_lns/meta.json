@@ -1,0 +1,8 @@
+{
+ "author": "athralk",
+ "url": "https://github.com/athralk/GNN-Routing-Optimisations",
+ "method": "Numba exact shortest-path-tree router: PathFinder negotiation + exact refinement + annealed LNS with negotiated stall kicks; a GATv2 destroy GNN picks which nets LNS rips up; warm-started 3 h runs, best legal run per case. runtime.json = total wall-clock of every run that contributed to a case (warm-start chain plus sibling runs), each case single-threaded.",
+ "date": "2026-10-29",
+ "hardware": "AMD Ryzen 9 8945HS (16 threads), 15 GB RAM; RTX 4060 Laptop GPU used only for GNN training/inference",
+ "threads": 1
+}
