@@ -44,17 +44,18 @@ do not edit it by hand.
 | 5 | pathfinder_lns | Tazeem Mahashin | 1.3884 | 9/9 | 144991 | missing |  | — |
 | 6 | warm_lns_refinement † | kesudh | 1.3874 | 9/9 | 145095 | missing |  | — |
 | 7 | reubalink | reubalink | 1.3622 | 9/9 | 147825 | missing |  | — |
-| 8 | iamparv7043 | Parv (iamparv7043) | 1.3019 | 9/9 | 155125 | 7333.40 | ✓ | — |
-| 9 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | missing |  | — |
-| 10 | synapse-surge | Sameer-Deepak | 1.2569 | 9/9 | 161183 | missing |  | — |
-| 11 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | missing |  | — |
-| 12 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | missing |  | reproduced |
-| 13 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
-| 14 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
-| 15 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
-| 16 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
-| 17 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
-| 18 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
+| 8 | gnn_destroy_lns | athralk | 1.3138 | 9/9 | 153413 | 270316.50 | ✓ | — |
+| 9 | iamparv7043 | Parv (iamparv7043) | 1.3019 | 9/9 | 155125 | 7333.40 | ✓ | — |
+| 10 | erikqu_root_aware_portfolio | erikqu | 1.2745 | 9/9 | 158455 | missing |  | — |
+| 11 | synapse-surge | Sameer-Deepak | 1.2569 | 9/9 | 161183 | missing |  | — |
+| 12 | lns_negotiated | adityuhkapoor | 1.2267 | 9/9 | 165367 | missing |  | — |
+| 13 | anvesh | anvesh | 1.1863 | 9/9 | 169737 | missing |  | reproduced |
+| 14 | ly | ly | 1.1500 | 9/9 | 175329 | 822.57 | ✓ | — |
+| 15 | negotiated_delay | Mantej Singh Gill | 1.1499 | 9/9 | 175879 | 105.39 | ✓ | — |
+| 16 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0508 | 9/9 | 192507 | 787.30 |  | — |
+| 17 | negotiated_x2 | Anthropic (reference) | 1.0168 | 9/9 | 198763 | 177.01 |  | — |
+| 18 | negotiated | Anthropic (reference) | 1.0000 | 9/9 | 201863 | 85.20 | ✓ | — |
+| 19 | negotiated_fast | Anthropic (reference) | — | 8/9 | — | 61.74 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on drama3d-portfolio; leonid-popryho (Leonid Popryho; YJ Kim); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
@@ -118,12 +119,13 @@ do not edit it by hand.
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.4354 | 3/3 | 209175 | 47267.61 | ✓ | — |
 | 5 | spt_lns | James (IrwinJam) | 1.4347 | 3/3 | 209415 | missing |  | — |
 | 6 | warm_lns_refinement † | kesudh | 1.4331 | 3/3 | 209509 | 3615.00 | ✓ | — |
-| 7 | iamparv7043 | Parv (iamparv7043) | 1.3276 | 3/3 | 226581 | 1309.30 | ✓ | — |
-| 8 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | missing |  | — |
-| 9 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | missing |  | — |
-| 10 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
-| 11 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
-| 12 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
+| 7 | gnn_destroy_lns | athralk | 1.3561 | 3/3 | 221879 | 68640.62 |  | — |
+| 8 | iamparv7043 | Parv (iamparv7043) | 1.3276 | 3/3 | 226581 | 1309.30 | ✓ | — |
+| 9 | lns_negotiated | adityuhkapoor | 1.2533 | 3/3 | 240751 | missing |  | — |
+| 10 | anvesh | anvesh | 1.2520 | 3/3 | 240501 | missing |  | — |
+| 11 | negotiated_delay | Mantej Singh Gill | 1.1947 | 3/3 | 252901 | 636.11 | ✓ | — |
+| 12 | synapse-surge | Sameer-Deepak | 1.1456 | 3/3 | 264847 | missing |  | — |
+| 13 | shivaahir158 | Shiva Ahir (PhD Candidate, Stony Brook University) | 1.0593 | 3/3 | 288347 | 3728.39 |  | — |
 
 † derivative entry (refines another entry's routes): coordinated_refinement builds on leonid-popryho (Leonid Popryho); warm_lns_refinement builds on pathfinder_lns (Taz33m).
 
