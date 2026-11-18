@@ -1,0 +1,9 @@
+{
+ "author": "Leonid Popryho",
+ "method": "Own router (method not disclosed), one unified fast configuration for every case: the time budget and the component switches are chosen from the instance itself, never from the tier or case name. Deterministic (fixed work budget).",
+ "date": "2026-11-18",
+ "hardware": "AMD Ryzen Threadripper PRO 9975WX (32 cores / 64 threads), 256 GB RAM",
+ "threads": 6,
+ "runtime_note": "runtime.json: wall-clock seconds of the router run (with its GPU step where used), measured on an idle machine, one case at a time; the JSON / text format conversions (tens of milliseconds) are not included",
+ "reproducibility": "deterministic: every route regenerates bit for bit from a recorded run manifest (instance, arguments, seed, binary hash); replayed 45/45 identical, GPU and CPU builds giving the same routes. The code is not published at this time."
+}
