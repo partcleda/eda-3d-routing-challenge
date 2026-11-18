@@ -45,8 +45,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.1566 | 20/20 | 339328 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.1563 | 20/20 | 339406 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.1575 | 20/20 | 338882 | 458763.57 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.1566 | 20/20 | 339328 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.1562 | 20/20 | 339546 | missing |  | — |
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.1514 | 20/20 | 341746 | 46476.76 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.1509 | 20/20 | 342006 | missing |  | — |
@@ -66,8 +66,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.4136 | 9/9 | 142321 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.4123 | 9/9 | 142413 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.4164 | 9/9 | 142011 | 352915.17 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.4136 | 9/9 | 142321 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.4085 | 9/9 | 142989 | missing |  | — |
 | 4 | spt_lns | James (IrwinJam) | 1.3971 | 9/9 | 144153 | missing |  | — |
 | 5 | pathfinder_lns | Tazeem Mahashin | 1.3884 | 9/9 | 144991 | missing |  | — |
@@ -91,8 +91,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.1399 | 8/8 | 531688 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.1397 | 8/8 | 531766 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.1414 | 8/8 | 530964 | 651406.32 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.1399 | 8/8 | 531688 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.1391 | 8/8 | 532016 | missing |  | — |
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.1277 | 8/8 | 537468 | 62411.00 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.1274 | 8/8 | 537576 | 7543.00 | ✓ | — |
@@ -109,8 +109,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.0984 | 1/1 | 1042314 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.0984 | 1/1 | 1042322 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.0993 | 1/1 | 1041474 | 493075.22 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.0984 | 1/1 | 1042314 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.0978 | 1/1 | 1042926 | missing |  | — |
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.0914 | 1/1 | 1048990 | 43262.89 | ✓ | — |
 | 5 | warm_lns_refinement † | kesudh | 1.0911 | 1/1 | 1049332 | 2070.00 | ✓ | — |
@@ -124,8 +124,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.3508 | 4/4 | 476231 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.3505 | 4/4 | 476333 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.3693 | 4/4 | 468981 | 458470.10 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.3508 | 4/4 | 476231 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.3392 | 4/4 | 479359 | missing |  | — |
 | 4 | spt_lns | James (IrwinJam) | 1.3156 | 4/4 | 489177 | missing |  | — |
 | 5 | pathfinder_lns | Tazeem Mahashin | 1.3111 | 4/4 | 490499 | 61369.30 | ✓ | — |
@@ -141,8 +141,8 @@ Submit by pull request; see [CONTRIBUTING.md](CONTRIBUTING.md). Also in [LEADERB
 
 | rank | submission | author | aggregate | legal | total delay | runtime (s) | Pareto | verified |
 |---:|---|---|---:|:---:|---:|---:|:---:|:---:|
-| 1 | coordinated_refinement † | jay-tau | 1.4673 | 3/3 | 204497 | missing |  | — |
-| 2 | leonid-popryho | Leonid Popryho | 1.4667 | 3/3 | 204581 | missing |  | — |
+| 1 | leonid-popryho | Leonid Popryho | 1.4843 | 3/3 | 202069 | 219882.32 | ✓ | — |
+| 2 | coordinated_refinement † | jay-tau | 1.4673 | 3/3 | 204497 | missing |  | — |
 | 3 | cuda-have-been-shorter | YJ Kim | 1.4634 | 3/3 | 204963 | missing |  | — |
 | 4 | pathfinder_lns | Tazeem Mahashin | 1.4354 | 3/3 | 209175 | 47267.61 | ✓ | — |
 | 5 | spt_lns | James (IrwinJam) | 1.4347 | 3/3 | 209415 | missing |  | — |
