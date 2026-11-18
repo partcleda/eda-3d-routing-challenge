@@ -1,5 +1,9 @@
 {
  "author": "Leonid Popryho",
- "method": "Own router (method not disclosed); routes produced from scratch, no warm starts from other entries",
- "date": "2026-10-03"
+ "method": "Own router (method not disclosed). Deterministic mode: a fixed work budget instead of wall time, so every run is a pure function of instance, arguments, seed and budget. Each route is the best of many runs; some runs continue our own earlier routes, never another entry's.",
+ "date": "2026-11-18",
+ "hardware": "AMD Ryzen Threadripper PRO 9975WX (32 cores / 64 threads), 256 GB RAM, NVIDIA RTX PRO 6000 Blackwell (one GPU, for a pre-step)",
+ "threads": 8,
+ "runtime_note": "runtime.json: wall-clock seconds of the whole chain of runs that produced the route (input to .sol.json), on a shared workstation",
+ "reproducibility": "every route regenerates bit for bit from a recorded run manifest (instance, arguments, seed, work budget, binary hash); verified by replaying chained routes from scratch. The code is not published at this time."
 }
