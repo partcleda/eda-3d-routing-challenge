@@ -1,0 +1,7 @@
+{
+ "author": "Devilbilly",
+ "method": "Negotiated-congestion rip-up-and-reroute (C++): FLUTE topology + delay-DP global routing, then 4 net orders negotiated in parallel at present-factor growth 1.3; the best legal result is kept",
+ "date": "2026-11-22",
+ "hardware": "AMD EPYC 9575F 64-core (128 threads), 314 GB RAM",
+ "threads": 8
+}
